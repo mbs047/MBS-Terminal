@@ -63,6 +63,16 @@ You can choose a default terminal starting directory:
 
 After installation, open a new Windows Terminal tab.
 
+## Restore Defaults
+
+If you want to undo the setup and go back to a plain Windows Terminal configuration, run:
+
+```powershell
+.\restore-default.ps1
+```
+
+The restore script creates timestamped backups before changing anything. It resets Windows Terminal settings, removes the MBS PowerShell startup hooks, and moves the MBS Starship/helper/icon files aside.
+
 ## Safety Notes
 
 The installer changes local terminal configuration. It creates a timestamped backup of Windows Terminal `settings.json` before writing the MBS Terminal settings.

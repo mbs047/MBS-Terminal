@@ -1,6 +1,8 @@
 # MBS Terminal Advanced Guide
 
-This guide documents the prompt, icons, colors, helper commands, install options, restore behavior, and build flow behind MBS Terminal.
+This guide documents the prompt, icons, colors, install options, restore behavior, and build flow behind MBS Terminal.
+
+For the complete command list, see [CUSTOM_COMMANDS.md](CUSTOM_COMMANDS.md).
 
 ## Prompt Icons
 
@@ -58,32 +60,9 @@ This guide documents the prompt, icons, colors, helper commands, install options
 | `assets/terminal-icons/mbs-cloud.png` | Azure Cloud Shell profile |
 | `assets/terminal-icons/mbs-terminal.ico` | Setup and restore executable icon |
 
-## Laravel Workflow
+## Custom Commands
 
-| Command | What It Does |
-| --- | --- |
-| `pa migrate` | Runs `php artisan migrate` |
-| `pat` | Runs `php artisan test --compact` |
-| `pclear` | Runs `php artisan optimize:clear` |
-| `proutes` | Runs `php artisan route:list --except-vendor` |
-| `ptinker` | Runs `php artisan tinker` |
-| `ldev` | Starts the best available local dev command |
-| `nr dev` | Runs `npm run dev` |
-
-## Directory Tools
-
-| Command | Behavior |
-| --- | --- |
-| `cd` | Opens the interactive folder navigator |
-| `cd W:\GitHub\MBS-Terminal` | Normal PowerShell directory change |
-| `ls` | Shows a clean table and hides dot-prefixed entries |
-| `ls -la` or `ls -all` | Shows hidden files |
-| `ls -nav` | Opens the arrow-key folder navigator |
-| `ls -file` | Shows files only |
-| `ls -dir` | Shows directories only |
-| `ls -recursive` | Shows recursive results |
-
-Navigator keys: `Up` / `Down` select, `Enter` opens, `Backspace` goes up, `Esc` or `Q` exits.
+The full Laravel, Composer, NPM, navigation, `ls`, autocomplete, and system helper command list lives in [CUSTOM_COMMANDS.md](CUSTOM_COMMANDS.md).
 
 ## `ls` Color Guide
 

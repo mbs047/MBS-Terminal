@@ -56,7 +56,7 @@ See [ADVANCED.md](ADVANCED.md) for:
 - Prompt icon and Git status meanings.
 - Full color palette.
 - Included icon assets.
-- All Laravel shortcuts.
+- Full [custom command reference](CUSTOM_COMMANDS.md).
 - `cd`, `ls`, and autocomplete behavior.
 - Script install options.
 - Restore details.

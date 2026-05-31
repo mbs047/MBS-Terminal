@@ -725,6 +725,21 @@ function Invoke-MbsDirectoryNavigator {
 }
 
 Remove-Item -Path Alias:ls -ErrorAction SilentlyContinue
+Remove-Item -Path Alias:cd -ErrorAction SilentlyContinue
+
+function cd {
+    param(
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]] $Path
+    )
+
+    if ($Path.Count -eq 0) {
+        Invoke-MbsDirectoryNavigator -StartPath '.'
+        return
+    }
+
+    Set-Location @Path
+}
 
 function ls {
     param(

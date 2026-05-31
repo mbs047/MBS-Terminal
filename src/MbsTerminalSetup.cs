@@ -1642,8 +1642,12 @@ namespace MbsTerminalSetup
             {
                 wizardPanel.Visible = !terminalVisible;
                 runPanel.Visible = terminalVisible;
-                bodyLayout.ColumnStyles[0].Width = terminalVisible ? 0F : 100F;
-                bodyLayout.ColumnStyles[1].Width = terminalVisible ? 100F : 0F;
+                bodyLayout.ColumnStyles[0].SizeType = SizeType.Absolute;
+                bodyLayout.ColumnStyles[0].Width = SidebarWidth;
+                bodyLayout.ColumnStyles[1].SizeType = SizeType.Percent;
+                bodyLayout.ColumnStyles[1].Width = terminalVisible ? 0F : 100F;
+                bodyLayout.ColumnStyles[2].SizeType = SizeType.Percent;
+                bodyLayout.ColumnStyles[2].Width = terminalVisible ? 100F : 0F;
             }
 
             backButton.Enabled = currentStep > 0 && currentStep < StepCount - 1 && !IsInstalling();

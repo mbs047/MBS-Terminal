@@ -391,7 +391,16 @@ function Remove-ComposerGlobalPackageIfInstalled {
         return
     }
 
-    & $composer.Source global show $PackageName --no-interaction *> $null
+    $previousErrorActionPreference = $ErrorActionPreference
+
+    try {
+        $ErrorActionPreference = 'Continue'
+        & $composer.Source global show $PackageName --no-interaction --no-ansi 1>$null 2>$null
+    } catch {
+        return
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
 
     if ($LASTEXITCODE -ne 0) {
         return

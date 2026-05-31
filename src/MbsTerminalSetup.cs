@@ -125,7 +125,7 @@ namespace MbsTerminalSetup
     internal sealed class InstallerForm : Form
     {
         private const int WizardContentWidth = 520;
-        private const int StepCount = 5;
+        private const int StepCount = 6;
 
         private static readonly Color BackgroundColor = Color.FromArgb(4, 4, 7);
         private static readonly Color HeaderStartColor = Color.FromArgb(3, 3, 6);
@@ -149,6 +149,7 @@ namespace MbsTerminalSetup
         private readonly Label[] stepLabels = new Label[StepCount];
         private readonly string[] stepTitles =
         {
+            "Terms",
             "Profile",
             "Runtime",
             "Tooling",
@@ -157,6 +158,7 @@ namespace MbsTerminalSetup
         };
         private readonly string[] wizardTitles =
         {
+            "Setup Terms",
             "Terminal Profile",
             "PHP Runtime",
             "Select Other Tooling",
@@ -165,6 +167,7 @@ namespace MbsTerminalSetup
         };
         private readonly string[] wizardDescriptions =
         {
+            "Review what this installer can change before continuing.",
             "Set the Windows Terminal starting folder and optional prompt dependency.",
             "Install PHP automatically, use an existing PHP folder, and prepare Composer.",
             "See what is already installed, then choose Laravel, Valet, and update behavior.",
@@ -179,6 +182,7 @@ namespace MbsTerminalSetup
         private Panel runPanel;
         private AnimatedAccentPanel runningVisualPanel;
         private Timer animationTimer;
+        private ModernCheckBox termsAcceptedBox;
         private ModernCheckBox installStarshipBox;
         private ModernCheckBox currentUserScopeBox;
         private ModernCheckBox allUsersScopeBox;
@@ -267,6 +271,7 @@ namespace MbsTerminalSetup
             wizardHost.Padding = new Padding(1);
             wizardLayout.Controls.Add(wizardHost, 0, 2);
 
+            wizardPages.Add(CreateTermsPage());
             wizardPages.Add(CreateProfilePage(options));
             wizardPages.Add(CreateRuntimePage(options));
             wizardPages.Add(CreateLaravelPage(options));
@@ -409,6 +414,7 @@ namespace MbsTerminalSetup
             int wizardChromeHeight = 136 + 18 + 18 + 10 + 10 + 76 + 72 + 62 + 10 + 12 + 2;
             int desiredClientWidth = Math.Max(960, contentSize.Width + wizardChromeWidth);
             int desiredClientHeight = Math.Max(640, contentSize.Height + wizardChromeHeight);
+            desiredClientHeight = (int)Math.Ceiling(desiredClientHeight * 1.25D);
 
             Rectangle workingArea = Screen.FromControl(this).WorkingArea;
             desiredClientWidth = Math.Min(desiredClientWidth, Math.Max(900, workingArea.Width - 80));
@@ -641,6 +647,11 @@ namespace MbsTerminalSetup
                         return;
                     }
 
+                    if (!TermsAccepted() && capturedIndex > 0)
+                    {
+                        return;
+                    }
+
                     currentStep = capturedIndex;
                     UpdateWizard();
                 };
@@ -682,6 +693,39 @@ namespace MbsTerminalSetup
             panel.Controls.Add(CreateFloatingLabel("No command output yet", 14F, FontStyle.Bold, TextColor, 20, 22, 440, 32));
             panel.Controls.Add(CreateFloatingLabel("Complete Profile, Runtime, Tooling, and Review. When you click Install, the wizard moves to Running and opens the terminal-style log here.", 9.4F, FontStyle.Regular, MutedTextColor, 20, 62, 460, 74));
             return panel;
+        }
+
+        private Control CreateTermsPage()
+        {
+            Panel page = CreateWideWizardPage();
+            AddPageControl(page, CreateSummaryGrid("Terms", "This setup can change terminal settings, PowerShell profile files, PATH entries, and developer tooling."), 22, 22);
+
+            RoundedPanel termsCard = new RoundedPanel();
+            termsCard.Width = WizardContentWidth;
+            termsCard.Height = 226;
+            termsCard.FillColor = Color.FromArgb(13, 14, 20);
+            termsCard.BorderColor = BorderColor;
+            termsCard.Radius = 8;
+            termsCard.BackColor = Color.FromArgb(9, 10, 15);
+
+            termsCard.Controls.Add(CreateFloatingLabel("Before you continue", 13F, FontStyle.Bold, TextColor, 18, 16, 460, 28));
+            termsCard.Controls.Add(CreateFloatingLabel("MBS Terminal Setup may copy or update Windows Terminal profile assets, PowerShell profile helper files, environment PATH entries, and optional developer tools selected in this wizard.", 9F, FontStyle.Regular, MutedTextColor, 18, 52, 478, 58));
+            termsCard.Controls.Add(CreateFloatingLabel("Some options use winget, Composer, or downloaded installers. Review each step before installing, and use All users only when you understand it may require administrator rights.", 9F, FontStyle.Regular, MutedTextColor, 18, 116, 478, 58));
+            termsCard.Controls.Add(CreateFloatingLabel("Nothing installs until the Review step and Install button.", 9.4F, FontStyle.Bold, Color.FromArgb(186, 230, 253), 18, 180, 478, 26));
+            AddPageControl(page, termsCard, 22, 126);
+
+            AddPageControl(page, CreateNoteCard("The command output stays hidden until the final Running step. PowerShell itself opens without a visible terminal window."), 560, 22);
+
+            termsAcceptedBox = CreateOptionRow(
+                "I accept these terms",
+                "Required before the setup options are shown.",
+                false
+            );
+            termsAcceptedBox.CheckedChanged += delegate { UpdateWizard(); };
+            AddPageControl(page, termsAcceptedBox.Parent, 560, 112);
+
+            AddPageControl(page, CreateNoteCard("You can close this installer now if you do not want these changes prepared on this machine."), 560, 194);
+            return page;
         }
 
         private Control CreateProfilePage(InstallerOptions options)
@@ -958,29 +1002,47 @@ namespace MbsTerminalSetup
             Label label = CreateFloatingLabel(title, 8.8F, FontStyle.Bold, TextColor, 0, 0, 460, 22);
             panel.Controls.Add(label);
 
-            TableLayoutPanel picker = new TableLayoutPanel();
-            picker.ColumnCount = 2;
-            picker.RowCount = 1;
+            RoundedPanel picker = new RoundedPanel();
             picker.Location = new Point(0, 28);
-            picker.Size = new Size(500, 40);
-            picker.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            picker.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104F));
+            picker.Size = new Size(500, 42);
+            picker.FillColor = FieldColor;
+            picker.BorderColor = BorderColor;
+            picker.Radius = 7;
+            picker.BackColor = panel.BackColor;
 
             textBox = new TextBox();
             textBox.BackColor = FieldColor;
-            textBox.BorderStyle = BorderStyle.FixedSingle;
-            textBox.Dock = DockStyle.Fill;
+            textBox.BorderStyle = BorderStyle.None;
             textBox.Font = CreateFont(9.5F, FontStyle.Regular);
             textBox.ForeColor = TextColor;
-            textBox.Margin = new Padding(0, 4, 10, 0);
+            textBox.Location = new Point(14, 13);
+            textBox.Size = new Size(350, 19);
             textBox.Text = value;
-            picker.Controls.Add(textBox, 0, 0);
+            picker.Controls.Add(textBox);
 
-            Button browseButton = CreateSecondaryButton("Browse");
-            browseButton.Dock = DockStyle.Fill;
-            browseButton.Margin = new Padding(0);
+            RoundedPanel browseButton = new RoundedPanel();
+            browseButton.Location = new Point(386, 1);
+            browseButton.Size = new Size(113, 40);
+            browseButton.FillColor = SurfaceAltColor;
+            browseButton.BorderColor = Color.Transparent;
+            browseButton.Radius = 6;
+            browseButton.BackColor = FieldColor;
+            browseButton.Cursor = Cursors.Hand;
             browseButton.Click += browseHandler;
-            picker.Controls.Add(browseButton, 1, 0);
+
+            Label browseLabel = CreateFloatingLabel("Browse", 9.2F, FontStyle.Bold, TextColor, 0, 0, 113, 40);
+            browseLabel.TextAlign = ContentAlignment.MiddleCenter;
+            browseLabel.Cursor = Cursors.Hand;
+            browseLabel.Click += browseHandler;
+            browseButton.Controls.Add(browseLabel);
+            picker.Controls.Add(browseButton);
+
+            Panel separator = new Panel();
+            separator.BackColor = BorderColor;
+            separator.Location = new Point(384, 8);
+            separator.Size = new Size(1, 26);
+            picker.Controls.Add(separator);
+            separator.BringToFront();
 
             panel.Controls.Add(picker);
             return panel;
@@ -1058,6 +1120,11 @@ namespace MbsTerminalSetup
             nextButton.Width = 118;
             nextButton.Click += delegate
             {
+                if (!TermsAccepted() && currentStep == 0)
+                {
+                    return;
+                }
+
                 if (currentStep < StepCount - 1)
                 {
                     currentStep++;
@@ -1259,6 +1326,7 @@ namespace MbsTerminalSetup
 
             bool terminalVisible = currentStep == StepCount - 1 || IsInstalling();
             bool isReviewStep = currentStep == StepCount - 2;
+            bool canLeaveTerms = currentStep != 0 || TermsAccepted();
 
             if (wizardPanel != null && runPanel != null && bodyLayout != null)
             {
@@ -1270,7 +1338,7 @@ namespace MbsTerminalSetup
 
             backButton.Enabled = currentStep > 0 && currentStep < StepCount - 1 && !IsInstalling();
             nextButton.Visible = currentStep < StepCount - 2;
-            nextButton.Enabled = !IsInstalling();
+            nextButton.Enabled = !IsInstalling() && canLeaveTerms;
             installButton.Visible = isReviewStep;
             installButton.Enabled = isReviewStep && !IsInstalling();
             cancelButton.Visible = terminalVisible;
@@ -1316,13 +1384,20 @@ namespace MbsTerminalSetup
             }
             else
             {
-                statusLabel.Text = "Step " + (currentStep + 1) + " of " + StepCount + ": " + stepTitles[currentStep];
+                statusLabel.Text = currentStep == 0 && !TermsAccepted()
+                    ? "Accept terms to continue"
+                    : "Step " + (currentStep + 1) + " of " + StepCount + ": " + stepTitles[currentStep];
             }
         }
 
         private bool IsInstalling()
         {
             return installerProcess != null && !installerProcess.HasExited;
+        }
+
+        private bool TermsAccepted()
+        {
+            return termsAcceptedBox != null && termsAcceptedBox.Checked;
         }
 
         private void UpdateReviewSummary()

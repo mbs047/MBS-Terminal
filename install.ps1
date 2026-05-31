@@ -622,7 +622,7 @@ function Install-WindowsTerminalSettings {
     Copy-Item -LiteralPath $settingsPath -Destination $backupPath -Force
 
     $settings = Get-Content -LiteralPath $TemplatePath -Raw | ConvertFrom-Json
-    $devIcon = (Join-Path $IconsDirectory 'mbs-dev-shell.png').Replace('\', '/')
+    $devIcon = (Join-Path $IconsDirectory 'mbs-pixel-avatar.png').Replace('\', '/')
     $cmdIcon = (Join-Path $IconsDirectory 'mbs-cmd.png').Replace('\', '/')
     $cloudIcon = (Join-Path $IconsDirectory 'mbs-cloud.png').Replace('\', '/')
 

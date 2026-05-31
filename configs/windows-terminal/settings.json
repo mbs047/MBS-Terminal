@@ -78,7 +78,7 @@
                 "commandline": "%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoLogo",
                 "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
                 "hidden": false,
-                "icon": "C:/Users/mbaob/.config/terminal-icons/mbs-dev-shell.png",
+                "icon": "C:/Users/mbaob/.config/terminal-icons/mbs-pixel-avatar.png",
                 "name": "MBS Dev Shell",
                 "startingDirectory": "W:\\GitHub\\MBS-Portfolio",
                 "tabTitle": "MBS Dev"

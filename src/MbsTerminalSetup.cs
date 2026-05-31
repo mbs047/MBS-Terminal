@@ -510,7 +510,6 @@ namespace MbsTerminalSetup
             int wizardChromeHeight = 136 + 18 + 18 + 10 + 10 + 76 + 72 + 62 + 10 + 12 + 2;
             int desiredClientWidth = Math.Max(960, contentSize.Width + wizardChromeWidth);
             int desiredClientHeight = Math.Max(640, contentSize.Height + wizardChromeHeight);
-            desiredClientHeight = (int)Math.Ceiling(desiredClientHeight * 1.25D);
 
             Rectangle workingArea = Screen.FromControl(this).WorkingArea;
             desiredClientWidth = Math.Min(desiredClientWidth, Math.Max(900, workingArea.Width - 80));

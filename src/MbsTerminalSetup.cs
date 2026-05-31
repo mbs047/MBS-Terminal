@@ -203,8 +203,9 @@ namespace MbsTerminalSetup
 
     internal sealed class InstallerForm : Form
     {
-        private const int WizardContentWidth = 520;
-        private const int WideContentWidth = 1058;
+        private const int SidebarWidth = 230;
+        private const int WizardContentWidth = 500;
+        private const int WideContentWidth = 500;
         private const int StepCount = 6;
 
         private static readonly Color BackgroundColor = Color.FromArgb(4, 4, 7);
@@ -274,6 +275,7 @@ namespace MbsTerminalSetup
         private TextBox startingDirectoryBox;
         private TextBox phpDirectoryBox;
         private TableLayoutPanel bodyLayout;
+        private Panel sidebarPanel;
         private Panel wizardPanel;
         private Panel runPanel;
         private AnimatedAccentPanel runningVisualPanel;
@@ -317,8 +319,9 @@ namespace MbsTerminalSetup
             ExitCode = 0;
             Text = "MBS Terminal Setup";
             StartPosition = FormStartPosition.CenterScreen;
-            MinimumSize = new Size(960, 640);
-            Size = new Size(1100, 720);
+            FormBorderStyle = FormBorderStyle.None;
+            MinimumSize = new Size(820, 580);
+            Size = new Size(820, 580);
             BackColor = BackgroundColor;
             ForeColor = TextColor;
             Font = CreateFont(9F, FontStyle.Regular);
@@ -333,13 +336,14 @@ namespace MbsTerminalSetup
             bodyLayout = CreateBodyLayout();
             shell.Controls.Add(bodyLayout, 0, 1);
 
+            sidebarPanel = CreateSidebar();
+            bodyLayout.Controls.Add(sidebarPanel, 0, 0);
+
             wizardPanel = CreatePanel();
-            bodyLayout.Controls.Add(wizardPanel, 0, 0);
+            bodyLayout.Controls.Add(wizardPanel, 1, 0);
 
             TableLayoutPanel wizardLayout = CreateWizardLayout();
             wizardPanel.Controls.Add(wizardLayout);
-
-            wizardLayout.Controls.Add(CreateStepper(), 0, 0);
 
             Panel titlePanel = new Panel();
             titlePanel.Dock = DockStyle.Fill;
@@ -384,7 +388,7 @@ namespace MbsTerminalSetup
             wizardLayout.Controls.Add(CreateWizardNav(), 0, 3);
 
             runPanel = CreatePanel();
-            bodyLayout.Controls.Add(runPanel, 1, 0);
+            bodyLayout.Controls.Add(runPanel, 2, 0);
 
             TableLayoutPanel runLayout = CreateRunLayout();
             runPanel.Controls.Add(runLayout);
@@ -498,6 +502,23 @@ namespace MbsTerminalSetup
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool DestroyIcon(IntPtr handle);
 
+        [DllImport("user32.dll")]
+        private static extern bool ReleaseCapture();
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr handle, int message, int wParam, int lParam);
+
+        private void TitleBarMouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left)
+            {
+                return;
+            }
+
+            ReleaseCapture();
+            SendMessage(Handle, 0xA1, 0x2, 0);
+        }
+
         private void FitWindowToFirstScreen()
         {
             if (wizardPages.Count == 0)
@@ -507,14 +528,14 @@ namespace MbsTerminalSetup
 
             Size contentSize = MeasureChildBounds(wizardPages[0]);
 
-            int wizardChromeWidth = 18 + 18 + 10 + 10 + 22 + 22 + 2;
-            int wizardChromeHeight = 136 + 18 + 18 + 10 + 10 + 76 + 72 + 62 + 10 + 12 + 2;
-            int desiredClientWidth = Math.Max(960, contentSize.Width + wizardChromeWidth);
-            int desiredClientHeight = Math.Max(640, contentSize.Height + wizardChromeHeight);
+            int wizardChromeWidth = SidebarWidth + 18 + 18 + 10 + 10 + 22 + 22 + 2;
+            int wizardChromeHeight = 44 + 18 + 18 + 10 + 10 + 72 + 62 + 10 + 12 + 2;
+            int desiredClientWidth = Math.Max(820, contentSize.Width + wizardChromeWidth);
+            int desiredClientHeight = Math.Max(580, contentSize.Height + wizardChromeHeight);
 
             Rectangle workingArea = Screen.FromControl(this).WorkingArea;
-            desiredClientWidth = Math.Min(desiredClientWidth, Math.Max(900, workingArea.Width - 80));
-            desiredClientHeight = Math.Min(desiredClientHeight, Math.Max(600, workingArea.Height - 80));
+            desiredClientWidth = Math.Min(desiredClientWidth, Math.Max(820, workingArea.Width - 80));
+            desiredClientHeight = Math.Min(desiredClientHeight, Math.Max(580, workingArea.Height - 80));
 
             ClientSize = new Size(desiredClientWidth, desiredClientHeight);
             MinimumSize = SizeFromClientSize(new Size(desiredClientWidth, desiredClientHeight));
@@ -632,7 +653,7 @@ namespace MbsTerminalSetup
             shell.BackColor = BackgroundColor;
             shell.ColumnCount = 1;
             shell.RowCount = 2;
-            shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 136F));
+            shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
             shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             return shell;
         }
@@ -643,13 +664,15 @@ namespace MbsTerminalSetup
             header.Dock = DockStyle.Fill;
             header.StartColor = HeaderStartColor;
             header.EndColor = HeaderEndColor;
-            header.Padding = new Padding(30, 20, 30, 18);
+            header.Padding = new Padding(14, 0, 12, 0);
+            header.MouseDown += TitleBarMouseDown;
 
             PictureBox icon = new PictureBox();
             icon.BackColor = Color.Transparent;
             icon.SizeMode = PictureBoxSizeMode.Zoom;
-            icon.Location = new Point(34, 28);
-            icon.Size = new Size(72, 72);
+            icon.Location = new Point(14, 10);
+            icon.Size = new Size(24, 24);
+            icon.MouseDown += TitleBarMouseDown;
 
             if (File.Exists(iconPath))
             {
@@ -658,15 +681,38 @@ namespace MbsTerminalSetup
 
             header.Controls.Add(icon);
 
-            header.Controls.Add(CreateFloatingLabel("MBS TERMINAL / DEV TOOLCHAIN", 8.8F, FontStyle.Bold, AccentColor, 128, 26, 520, 22));
-            header.Controls.Add(CreateFloatingLabel("Laravel Ready Wizard", 27F, FontStyle.Bold, TextColor, 126, 48, 600, 48));
-            header.Controls.Add(CreateFloatingLabel("A staged desktop setup for Windows Terminal, PHP, Composer, Laravel, and Valet for Windows.", 10F, FontStyle.Regular, MutedTextColor, 128, 94, 820, 24));
+            Label title = CreateFloatingLabel("MBS Terminal Setup", 9.5F, FontStyle.Bold, TextColor, 48, 0, 240, 44);
+            title.MouseDown += TitleBarMouseDown;
+            header.Controls.Add(title);
 
-            AddPill(header, "Modern UI", 750, 38, AccentColor);
-            AddPill(header, "Hidden Shell", 860, 38, AccentAltColor);
-            AddPill(header, "Animated Run", 984, 38, WarningColor);
+            Label minimizeButton = CreateWindowButton("-", Width - 88, 0);
+            minimizeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            minimizeButton.Click += delegate { WindowState = FormWindowState.Minimized; };
+            header.Controls.Add(minimizeButton);
+
+            Label closeButton = CreateWindowButton("x", Width - 44, 0);
+            closeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            closeButton.Click += delegate { Close(); };
+            header.Controls.Add(closeButton);
 
             return header;
+        }
+
+        private static Label CreateWindowButton(string text, int left, int top)
+        {
+            Label button = new Label();
+            button.AutoSize = false;
+            button.Text = text;
+            button.TextAlign = ContentAlignment.MiddleCenter;
+            button.Font = CreateFont(11F, FontStyle.Bold);
+            button.ForeColor = MutedTextColor;
+            button.BackColor = Color.Transparent;
+            button.Location = new Point(left, top);
+            button.Size = new Size(44, 44);
+            button.Cursor = Cursors.Hand;
+            button.MouseEnter += delegate { button.BackColor = SurfaceAltColor; button.ForeColor = TextColor; };
+            button.MouseLeave += delegate { button.BackColor = Color.Transparent; button.ForeColor = MutedTextColor; };
+            return button;
         }
 
         private static void AddPill(Control parent, string text, int left, int top, Color color)
@@ -688,9 +734,10 @@ namespace MbsTerminalSetup
             TableLayoutPanel body = new TableLayoutPanel();
             body.Dock = DockStyle.Fill;
             body.BackColor = BackgroundColor;
-            body.ColumnCount = 2;
+            body.ColumnCount = 3;
             body.RowCount = 1;
             body.Padding = new Padding(18);
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, SidebarWidth));
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 0F));
             body.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
@@ -717,11 +764,92 @@ namespace MbsTerminalSetup
             layout.RowCount = 4;
             layout.Dock = DockStyle.Fill;
             layout.BackColor = SurfaceColor;
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 76F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 0F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 72F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 62F));
             return layout;
+        }
+
+        private Panel CreateSidebar()
+        {
+            RoundedPanel sidebar = new RoundedPanel();
+            sidebar.Dock = DockStyle.Fill;
+            sidebar.Margin = new Padding(10, 10, 8, 10);
+            sidebar.Padding = new Padding(18);
+            sidebar.BackColor = BackgroundColor;
+            sidebar.FillColor = Color.FromArgb(12, 12, 16);
+            sidebar.BorderColor = Color.FromArgb(35, 37, 49);
+            sidebar.Radius = 12;
+
+            PictureBox logo = new PictureBox();
+            logo.BackColor = Color.Transparent;
+            logo.SizeMode = PictureBoxSizeMode.Zoom;
+            logo.Location = new Point(18, 20);
+            logo.Size = new Size(46, 46);
+
+            if (File.Exists(iconPath))
+            {
+                logo.Image = Image.FromFile(iconPath);
+            }
+
+            sidebar.Controls.Add(logo);
+            sidebar.Controls.Add(CreateFloatingLabel("MBS Terminal", 13F, FontStyle.Bold, TextColor, 74, 20, 126, 26));
+            sidebar.Controls.Add(CreateFloatingLabel("Laravel Ready", 8.5F, FontStyle.Regular, MutedTextColor, 75, 46, 120, 20));
+
+            Panel stepHost = new Panel();
+            stepHost.BackColor = Color.Transparent;
+            stepHost.Location = new Point(18, 96);
+            stepHost.Size = new Size(190, 340);
+            sidebar.Controls.Add(stepHost);
+
+            for (int index = 0; index < StepCount; index++)
+            {
+                Label step = new Label();
+                step.AutoSize = false;
+                step.Location = new Point(0, index * 50);
+                step.Size = new Size(190, 40);
+                step.TextAlign = ContentAlignment.MiddleLeft;
+                step.Padding = new Padding(38, 0, 8, 0);
+                step.Font = CreateFont(9F, FontStyle.Bold);
+                step.Text = stepTitles[index];
+                step.Cursor = Cursors.Hand;
+                int capturedIndex = index;
+                EventHandler stepClick = delegate
+                {
+                    if (IsInstalling() || (capturedIndex == StepCount - 1 && !installHasRun))
+                    {
+                        return;
+                    }
+
+                    if (!TermsAccepted() && capturedIndex > 0)
+                    {
+                        return;
+                    }
+
+                    currentStep = capturedIndex;
+                    UpdateWizard();
+                };
+                step.Click += stepClick;
+
+                Label dot = new Label();
+                dot.AutoSize = false;
+                dot.Location = new Point(10, index * 50 + 11);
+                dot.Size = new Size(18, 18);
+                dot.TextAlign = ContentAlignment.MiddleCenter;
+                dot.Font = CreateFont(8F, FontStyle.Bold);
+                dot.Text = (index + 1).ToString();
+                dot.Cursor = Cursors.Hand;
+                dot.Click += stepClick;
+
+                stepLabels[index] = step;
+                stepHost.Controls.Add(dot);
+                stepHost.Controls.Add(step);
+            }
+
+            sidebar.Controls.Add(CreateFloatingLabel("v1.0", 8F, FontStyle.Regular, MutedTextColor, 18, 446, 80, 20));
+            sidebar.Controls.Add(CreateFloatingLabel("Admin installer", 8F, FontStyle.Bold, Color.FromArgb(186, 230, 253), 18, 468, 160, 20));
+            return sidebar;
         }
 
         private TableLayoutPanel CreateStepper()

@@ -6,6 +6,7 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
 namespace MbsTerminalSetup
@@ -2550,13 +2551,20 @@ namespace MbsTerminalSetup
                 return;
             }
 
+            string displayMessage = NormalizeInstallerLogMessage(message);
+
+            if (displayMessage.Length == 0)
+            {
+                return;
+            }
+
             logBox.SelectionStart = logBox.TextLength;
             logBox.SelectionLength = 0;
             logBox.SelectionColor = color;
-            logBox.AppendText(message + Environment.NewLine);
+            logBox.AppendText(displayMessage + Environment.NewLine);
             logBox.SelectionColor = logBox.ForeColor;
             logBox.ScrollToCaret();
-            UpdateRunningStatusFromLog(message);
+            UpdateRunningStatusFromLog(displayMessage);
         }
 
         private void UpdateRunningStatusFromLog(string message)
@@ -2566,14 +2574,18 @@ namespace MbsTerminalSetup
                 return;
             }
 
-            string statusText = message == null ? string.Empty : message.Trim();
+            string statusText = NormalizeInstallerLogMessage(message);
 
             if (statusText.StartsWith("[MBS-Terminal]", StringComparison.OrdinalIgnoreCase))
             {
                 statusText = statusText.Substring("[MBS-Terminal]".Length).Trim();
             }
 
-            if (statusText.Length == 0 || statusText.StartsWith("Warning:", StringComparison.OrdinalIgnoreCase))
+            if (statusText.Length == 0
+                || statusText.StartsWith("Warning:", StringComparison.OrdinalIgnoreCase)
+                || statusText.StartsWith("PHP Fatal error:", StringComparison.OrdinalIgnoreCase)
+                || statusText.StartsWith("Stack trace:", StringComparison.OrdinalIgnoreCase)
+                || Regex.IsMatch(statusText, @"^#\d+\s"))
             {
                 return;
             }
@@ -2586,6 +2598,72 @@ namespace MbsTerminalSetup
             statusLabel.Text = statusText;
             runningVisualPanel.StatusText = statusText;
             runningVisualPanel.Invalidate();
+        }
+
+        private static string NormalizeInstallerLogMessage(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return string.Empty;
+            }
+
+            string text = StripAnsi(message).Replace('\r', ' ').Replace('\n', ' ').Trim();
+
+            if (text.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            string progressText = ExtractProgressStatus(text);
+
+            if (progressText.Length > 0)
+            {
+                return progressText;
+            }
+
+            if (Regex.IsMatch(text, @"^\s*\d+/\d+\s+"))
+            {
+                return string.Empty;
+            }
+
+            return Regex.Replace(text, @"\s+", " ").Trim();
+        }
+
+        private static string StripAnsi(string text)
+        {
+            return Regex.Replace(text, @"\x1B\[[0-9;?]*[ -/]*[@-~]", string.Empty);
+        }
+
+        private static string ExtractProgressStatus(string text)
+        {
+            string compact = Regex.Replace(text, @"\s+", " ").Trim();
+            Match progressMatch = Regex.Match(compact, @"(?:^|\s)\d+/\d+\s+.*?(\d{1,3}%\s+.+)$");
+
+            if (!progressMatch.Success)
+            {
+                return string.Empty;
+            }
+
+            string status = progressMatch.Groups[1].Value.Trim();
+            string[] stopMarkers = new[]
+            {
+                "PHP Fatal error:",
+                "Stack trace:",
+                " Uncaught ",
+                " thrown in "
+            };
+
+            foreach (string marker in stopMarkers)
+            {
+                int markerIndex = status.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+
+                if (markerIndex >= 0)
+                {
+                    status = status.Substring(0, markerIndex).TrimEnd();
+                }
+            }
+
+            return Regex.Replace(status, @"\s+", " ").Trim();
         }
 
         private void InstallerFormClosing(object sender, FormClosingEventArgs e)

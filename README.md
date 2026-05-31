@@ -2,6 +2,8 @@
 
 MBS Terminal is my Windows Terminal setup for Laravel development. It packages the same theme, prompt, icons, welcome message, aliases, autocomplete behavior, and custom `ls` helpers that I use locally.
 
+![MBS Terminal preview](assets/screenshots/terminal-preview.png)
+
 ## Features
 
 - Windows Terminal theme with acrylic transparency and the MBS Midnight color scheme.

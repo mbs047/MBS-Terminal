@@ -604,7 +604,7 @@ function Install-PowerShellProfile {
         [string] $TargetProfile,
 
         [Parameter(Mandatory = $true)]
-        [string] $PortfolioPath,
+        [string] $StartPath,
 
         [Parameter(Mandatory = $true)]
         [string] $DisplayName
@@ -613,10 +613,10 @@ function Install-PowerShellProfile {
     $targetHelper = Join-Path $HOME '.config\powershell\laravel-dev.ps1'
     Copy-FileEnsuringDirectory -Source $SourceProfile -Destination $targetHelper
 
-    $escapedPortfolioPath = $PortfolioPath.Replace("'", "''")
+    $escapedStartPath = $StartPath.Replace("'", "''")
     $escapedDisplayName = $DisplayName.Replace("'", "''")
     $helperContent = Get-Content -LiteralPath $targetHelper -Raw
-    $helperContent = $helperContent -replace "\`$script:MbsPortfolioPath = '.*?'", "`$script:MbsPortfolioPath = '$escapedPortfolioPath'"
+    $helperContent = $helperContent -replace "\`$script:MbsStartPath = '.*?'", "`$script:MbsStartPath = '$escapedStartPath'"
     $helperContent = $helperContent -replace "\`$script:MbsDisplayName = '.*?'", "`$script:MbsDisplayName = '$escapedDisplayName'"
     Set-Content -LiteralPath $targetHelper -Value $helperContent -Encoding ASCII
 
@@ -730,14 +730,9 @@ function Install-WindowsTerminalSettings {
 }
 
 $repositoryRoot = Get-RepositoryRoot
-$defaultPortfolioPath = 'W:\GitHub\MBS-Portfolio'
 
 if ([string]::IsNullOrWhiteSpace($StartingDirectory)) {
-    if (Test-Path -LiteralPath $defaultPortfolioPath) {
-        $StartingDirectory = $defaultPortfolioPath
-    } else {
-        $StartingDirectory = $HOME
-    }
+    $StartingDirectory = $HOME
 }
 
 $DisplayName = Resolve-DisplayName -Value $DisplayName
@@ -763,7 +758,7 @@ $starshipContent = $starshipContent.Replace('__MBS_DISPLAY_NAME__', $DisplayName
 [System.IO.File]::WriteAllText($starshipTarget, $starshipContent, [System.Text.UTF8Encoding]::new($true))
 
 Write-Step 'Installing PowerShell helper profile.'
-Install-PowerShellProfile -SourceProfile $profileSource -TargetProfile $PROFILE.CurrentUserCurrentHost -PortfolioPath $StartingDirectory -DisplayName $DisplayName
+Install-PowerShellProfile -SourceProfile $profileSource -TargetProfile $PROFILE.CurrentUserCurrentHost -StartPath $StartingDirectory -DisplayName $DisplayName
 
 Write-Step 'Installing Windows Terminal settings.'
 Install-WindowsTerminalSettings -TemplatePath $terminalSource -IconsDirectory $iconsTarget -StartingDirectory $StartingDirectory

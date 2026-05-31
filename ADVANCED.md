@@ -101,8 +101,8 @@ The GUI wraps `install.ps1`. You can also run the script directly:
 Useful options:
 
 ```powershell
-.\install.ps1 -StartingDirectory "W:\GitHub\MBS-Portfolio"
-.\install.ps1 -DisplayName "mbaob"
+.\install.ps1 -StartingDirectory "C:\Code\MyLaravelApp"
+.\install.ps1 -DisplayName "Developer"
 .\install.ps1 -InstallScope CurrentUser
 .\install.ps1 -InstallValet -InstallPint -InstallEnvoy -InstallVapor
 .\install.ps1 -PhpDirectory "C:\laragon\bin\php\php-8.4"

@@ -1,4 +1,4 @@
-$script:MbsPortfolioPath = 'W:\GitHub\MBS-Portfolio'
+$script:MbsStartPath = '~'
 $script:MbsDisplayName = '__MBS_DISPLAY_NAME__'
 $script:LaravelArtisanCommandCache = @{}
 $script:ComposerScriptsCache = @{}
@@ -97,8 +97,8 @@ function Invoke-InLaravelProject {
     }
 }
 
-function Set-MbsPortfolio {
-    Set-Location $script:MbsPortfolioPath
+function Set-DevHome {
+    Set-Location $script:MbsStartPath
 }
 
 function Invoke-LaravelArtisan {
@@ -387,12 +387,12 @@ Register-ArgumentCompleter -Native -CommandName npm -ScriptBlock {
     }
 }
 
-@('mbs', 'pa', 'art', 'pat', 'pintd', 'pclear', 'proutes', 'ptinker', 'ldev', 'cr', 'nr') | ForEach-Object {
+@('mbs', 'devhome', 'pa', 'art', 'pat', 'pintd', 'pclear', 'proutes', 'ptinker', 'ldev', 'cr', 'nr') | ForEach-Object {
     Remove-Item -Path "Alias:$_" -ErrorAction SilentlyContinue
 }
 
-function mbs {
-    Set-MbsPortfolio
+function devhome {
+    Set-DevHome
 }
 
 function pa {

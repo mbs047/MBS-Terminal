@@ -44,7 +44,7 @@ Both commands support script-name autocomplete from the nearest `composer.json` 
 
 | Command | Example | What It Does |
 | --- | --- | --- |
-| `mbs` | `mbs` | Jumps to the configured MBS portfolio/start folder |
+| `devhome` | `devhome` | Jumps to the configured starting folder |
 | `cd` | `cd` | Opens the interactive folder navigator |
 | `cd <path>` | `cd W:\GitHub\MBS-Terminal` | Keeps normal PowerShell directory changing behavior |
 | `ls -nav` | `ls -nav` | Opens the interactive folder navigator |
@@ -61,7 +61,7 @@ Both commands support script-name autocomplete from the nearest `composer.json` 
 
 ## File Listing Commands
 
-`ls` replaces the default PowerShell alias with an MBS table view.
+`ls` replaces the default PowerShell alias with a clean table view.
 
 | Command | What It Does |
 | --- | --- |

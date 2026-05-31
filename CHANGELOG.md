@@ -15,6 +15,7 @@ First public release of MBS Terminal.
 - UTF-8-safe Starship and PowerShell profile installation.
 - Laravel-focused PowerShell helpers, aliases, completions, and welcome banner.
 - Interactive folder navigator through `ls -nav` and empty `cd`.
+- Generic `devhome` command for jumping to the configured starting folder without personal project naming.
 - Colorized `ls` table output for directories, executables, scripts, docs, configs, images, archives, hidden items, locks, and logs.
 - Optional installer support for PHP 8.2, 8.3, 8.4, 8.5, Composer, Laravel Installer, Valet for Windows, Pint, Envoy, Vapor CLI, Starship, and tool updates.
 - Valet for Windows Composer isolation and known post-success Symfony exit handling.
@@ -22,5 +23,6 @@ First public release of MBS Terminal.
 ### Fixed
 
 - Prevented terminal prompt icon mojibake by reading and writing Starship config as UTF-8.
+- Removed the personal `MBS-Portfolio` default path so public installs default to the user's home folder unless a starting directory is selected.
 - Cleaned installer running-status messages so raw progress glyphs and stack traces do not become the primary status text.
 - Improved README with updated screenshot, prompt icon guide, color guide, install options, and command documentation.

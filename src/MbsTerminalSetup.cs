@@ -706,13 +706,6 @@ namespace MbsTerminalSetup
                 return requestedPath;
             }
 
-            const string defaultPortfolioPath = @"W:\GitHub\MBS-Portfolio";
-
-            if (Directory.Exists(defaultPortfolioPath))
-            {
-                return defaultPortfolioPath;
-            }
-
             return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         }
 

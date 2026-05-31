@@ -187,6 +187,16 @@ function Get-ComposerGlobalBin {
     return Join-Path $env:APPDATA 'Composer\vendor\bin'
 }
 
+function Get-ValetComposerHome {
+    return Join-Path $env:APPDATA 'Composer\mbs-valet'
+}
+
+function Get-ComposerBinFromHome {
+    param([string] $ComposerHome)
+
+    return Join-Path $ComposerHome 'vendor\bin'
+}
+
 function Invoke-ExternalCommand {
     param(
         [Parameter(Mandatory = $true)]
@@ -349,7 +359,9 @@ function Install-ComposerGlobalPackage {
         [string] $PackageName,
 
         [Parameter(Mandatory = $true)]
-        [string] $Label
+        [string] $Label,
+
+        [string] $ComposerHome = ''
     )
 
     $composer = Get-Command composer -ErrorAction SilentlyContinue
@@ -359,7 +371,17 @@ function Install-ComposerGlobalPackage {
         return $false
     }
 
+    $previousComposerHome = $env:COMPOSER_HOME
+
     try {
+        if (-not [string]::IsNullOrWhiteSpace($ComposerHome)) {
+            if (-not (Test-Path -LiteralPath $ComposerHome)) {
+                New-Item -ItemType Directory -Path $ComposerHome | Out-Null
+            }
+
+            $env:COMPOSER_HOME = $ComposerHome
+        }
+
         Invoke-ExternalCommand -FilePath $composer.Source -Arguments @(
             'global',
             'require',
@@ -367,12 +389,20 @@ function Install-ComposerGlobalPackage {
             '--with-all-dependencies',
             '--no-interaction'
         ) -Description "Installing $Label with Composer."
-        Add-PathEntry -Directory (Get-ComposerGlobalBin)
+        $composerBin = if ([string]::IsNullOrWhiteSpace($ComposerHome)) {
+            Get-ComposerGlobalBin
+        } else {
+            Get-ComposerBinFromHome -ComposerHome $ComposerHome
+        }
+
+        Add-PathEntry -Directory $composerBin
         Refresh-ProcessPath
         return $true
     } catch {
         Write-SoftWarning "Could not install $Label. $($_.Exception.Message)"
         return $false
+    } finally {
+        $env:COMPOSER_HOME = $previousComposerHome
     }
 }
 
@@ -434,21 +464,33 @@ function Install-ValetIfRequested {
     Write-Step 'Valet for Windows uses ycodetech/valet-windows because the original cretueusebiu package is blocked by Composer security policy.'
     Remove-ComposerGlobalPackageIfInstalled -PackageName 'cretueusebiu/valet-windows' -Label 'legacy Valet for Windows'
 
-    $installed = Install-ComposerGlobalPackage -PackageName 'ycodetech/valet-windows' -Label 'Valet for Windows'
+    $valetComposerHome = Get-ValetComposerHome
+    Write-Step "Installing Valet in an isolated Composer home: $valetComposerHome"
+
+    $installed = Install-ComposerGlobalPackage -PackageName 'ycodetech/valet-windows' -Label 'Valet for Windows' -ComposerHome $valetComposerHome
 
     if (-not $installed) {
         return
     }
 
-    $valet = Get-Command valet -ErrorAction SilentlyContinue
+    $valetBin = Get-ComposerBinFromHome -ComposerHome $valetComposerHome
+    $valetCommand = Join-Path $valetBin 'valet.bat'
 
-    if (-not $valet) {
-        Write-SoftWarning 'Valet was installed, but valet was not found in PATH yet. Open a new terminal and run: valet install'
+    if (-not (Test-Path -LiteralPath $valetCommand)) {
+        $valet = Get-Command valet -ErrorAction SilentlyContinue
+
+        if ($valet) {
+            $valetCommand = $valet.Source
+        }
+    }
+
+    if (-not (Test-Path -LiteralPath $valetCommand)) {
+        Write-SoftWarning "Valet was installed, but valet.bat was not found in $valetBin. Open a new terminal and run: valet install"
         return
     }
 
     try {
-        Invoke-ExternalCommand -FilePath $valet.Source -Arguments @('install') -Description 'Running valet install.'
+        Invoke-ExternalCommand -FilePath $valetCommand -Arguments @('install') -Description 'Running valet install.'
     } catch {
         Write-SoftWarning "Valet package installed, but valet install did not complete. $($_.Exception.Message)"
     }

@@ -17,20 +17,35 @@ if (-not $compiler) {
     throw 'C# compiler was not found. Expected .NET Framework csc.exe.'
 }
 
-$source = Join-Path $repositoryRoot 'src\MbsTerminalSetup.cs'
-$output = Join-Path $repositoryRoot 'MBS-Terminal-Setup.exe'
+function Build-WindowsExecutable {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Source,
 
-& $compiler `
-    /nologo `
-    /optimize+ `
-    /target:winexe `
-    /reference:System.Drawing.dll `
-    /reference:System.Windows.Forms.dll `
-    "/out:$output" `
-    $source
+        [Parameter(Mandatory = $true)]
+        [string] $Output
+    )
 
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+    & $compiler `
+        /nologo `
+        /optimize+ `
+        /target:winexe `
+        /reference:System.Drawing.dll `
+        /reference:System.Windows.Forms.dll `
+        "/out:$Output" `
+        $Source
+
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    Write-Host "Built $Output" -ForegroundColor Cyan
 }
 
-Write-Host "Built $output" -ForegroundColor Cyan
+Build-WindowsExecutable `
+    -Source (Join-Path $repositoryRoot 'src\MbsTerminalSetup.cs') `
+    -Output (Join-Path $repositoryRoot 'MBS-Terminal-Setup.exe')
+
+Build-WindowsExecutable `
+    -Source (Join-Path $repositoryRoot 'src\MbsTerminalRestore.cs') `
+    -Output (Join-Path $repositoryRoot 'MBS-Terminal-Restore.exe')

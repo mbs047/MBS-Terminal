@@ -68,6 +68,12 @@ After installation, open a new Windows Terminal tab.
 If you want to undo the setup and go back to a plain Windows Terminal configuration, run:
 
 ```powershell
+.\MBS-Terminal-Restore.exe
+```
+
+Or run the PowerShell restore script directly:
+
+```powershell
 .\restore-default.ps1
 ```
 
@@ -87,9 +93,9 @@ Review `install.ps1` before running it if you are installing from a fork or from
 - Updates the current Windows PowerShell profile to load the helpers and Starship.
 - Updates Windows Terminal `settings.json` and creates a timestamped backup first.
 
-## Build The EXE
+## Build The EXEs
 
-The launcher is intentionally small. It runs `install.ps1` through Windows PowerShell.
+The launchers are intentionally small. They run `install.ps1` and `restore-default.ps1` through Windows PowerShell.
 
 ```powershell
 .\build-installer.ps1

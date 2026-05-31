@@ -74,6 +74,6 @@ style = "fg:#53627A"
 time_format = "%H:%M"
 
 [username]
-format = "[◆ Mohammed]($style) "
+format = "[◆ __MBS_DISPLAY_NAME__]($style) "
 show_always = true
 style_user = "bold fg:#D6DEEB"

@@ -8,7 +8,8 @@ param(
     [switch] $InstallValet,
     [switch] $UpdateTools,
     [ValidateSet('CurrentUser', 'AllUsers')]
-    [string] $InstallScope = 'CurrentUser'
+    [string] $InstallScope = 'CurrentUser',
+    [string] $DisplayName = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -59,6 +60,29 @@ function Test-IsAdministrator {
 
 if (-not (Test-IsAdministrator)) {
     throw 'MBS Terminal installer must be run as administrator.'
+}
+
+function Resolve-DisplayName {
+    param([string] $Value)
+
+    $resolvedName = $Value
+
+    if ([string]::IsNullOrWhiteSpace($resolvedName)) {
+        $resolvedName = $env:USERNAME
+    }
+
+    if ([string]::IsNullOrWhiteSpace($resolvedName)) {
+        $resolvedName = 'Developer'
+    }
+
+    $resolvedName = $resolvedName.Trim()
+    $resolvedName = $resolvedName -replace '[\r\n\[\]]', ''
+
+    if ([string]::IsNullOrWhiteSpace($resolvedName)) {
+        return 'Developer'
+    }
+
+    return $resolvedName
 }
 
 function Get-EnvironmentTarget {
@@ -420,15 +444,20 @@ function Install-PowerShellProfile {
         [string] $TargetProfile,
 
         [Parameter(Mandatory = $true)]
-        [string] $PortfolioPath
+        [string] $PortfolioPath,
+
+        [Parameter(Mandatory = $true)]
+        [string] $DisplayName
     )
 
     $targetHelper = Join-Path $HOME '.config\powershell\laravel-dev.ps1'
     Copy-FileEnsuringDirectory -Source $SourceProfile -Destination $targetHelper
 
     $escapedPortfolioPath = $PortfolioPath.Replace("'", "''")
+    $escapedDisplayName = $DisplayName.Replace("'", "''")
     $helperContent = Get-Content -LiteralPath $targetHelper -Raw
     $helperContent = $helperContent -replace "\`$script:MbsPortfolioPath = '.*?'", "`$script:MbsPortfolioPath = '$escapedPortfolioPath'"
+    $helperContent = $helperContent -replace "\`$script:MbsDisplayName = '.*?'", "`$script:MbsDisplayName = '$escapedDisplayName'"
     Set-Content -LiteralPath $targetHelper -Value $helperContent -Encoding ASCII
 
     $profileDirectory = Split-Path -Path $TargetProfile -Parent
@@ -551,6 +580,8 @@ if ([string]::IsNullOrWhiteSpace($StartingDirectory)) {
     }
 }
 
+$DisplayName = Resolve-DisplayName -Value $DisplayName
+
 $starshipSource = Join-Path $repositoryRoot 'configs\starship.toml'
 $terminalSource = Join-Path $repositoryRoot 'configs\windows-terminal\settings.json'
 $profileSource = Join-Path $repositoryRoot 'configs\powershell\laravel-dev.ps1'
@@ -565,10 +596,14 @@ if (-not (Test-Path -LiteralPath $iconsTarget)) {
 Get-ChildItem -Path (Join-Path $iconsSource '*.png') | Copy-Item -Destination $iconsTarget -Force
 
 Write-Step 'Installing Starship config.'
-Copy-FileEnsuringDirectory -Source $starshipSource -Destination (Join-Path $HOME '.config\starship.toml')
+$starshipTarget = Join-Path $HOME '.config\starship.toml'
+Copy-FileEnsuringDirectory -Source $starshipSource -Destination $starshipTarget
+$starshipContent = Get-Content -LiteralPath $starshipTarget -Raw
+$starshipContent = $starshipContent.Replace('__MBS_DISPLAY_NAME__', $DisplayName)
+Set-Content -LiteralPath $starshipTarget -Value $starshipContent -Encoding UTF8
 
 Write-Step 'Installing PowerShell helper profile.'
-Install-PowerShellProfile -SourceProfile $profileSource -TargetProfile $PROFILE.CurrentUserCurrentHost -PortfolioPath $StartingDirectory
+Install-PowerShellProfile -SourceProfile $profileSource -TargetProfile $PROFILE.CurrentUserCurrentHost -PortfolioPath $StartingDirectory -DisplayName $DisplayName
 
 Write-Step 'Installing Windows Terminal settings.'
 Install-WindowsTerminalSettings -TemplatePath $terminalSource -IconsDirectory $iconsTarget -StartingDirectory $StartingDirectory

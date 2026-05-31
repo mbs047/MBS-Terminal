@@ -117,6 +117,7 @@ namespace MbsTerminalSetup
         public bool InstallValet { get; set; }
         public bool UpdateTools { get; set; }
         public string InstallScope { get; set; }
+        public string DisplayName { get; set; }
 
         public static InstallerOptions FromArgs(string[] args)
         {
@@ -183,6 +184,13 @@ namespace MbsTerminalSetup
                         ? "AllUsers"
                         : "CurrentUser";
                     index++;
+                    continue;
+                }
+
+                if (IsSwitch(argument, "DisplayName") && index + 1 < args.Length)
+                {
+                    options.DisplayName = args[index + 1];
+                    index++;
                 }
             }
 
@@ -205,7 +213,7 @@ namespace MbsTerminalSetup
     {
         private const int SidebarWidth = 230;
         private const int WizardContentWidth = 500;
-        private const int WideContentWidth = 500;
+        private const int WideContentWidth = 1058;
         private const int StepCount = 6;
 
         private static readonly Color BackgroundColor = Color.FromArgb(4, 4, 7);
@@ -273,6 +281,7 @@ namespace MbsTerminalSetup
         };
 
         private TextBox startingDirectoryBox;
+        private TextBox displayNameBox;
         private TextBox phpDirectoryBox;
         private TableLayoutPanel bodyLayout;
         private Panel sidebarPanel;
@@ -615,6 +624,21 @@ namespace MbsTerminalSetup
             }
 
             return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        }
+
+        private static string ResolveDisplayName(string requestedName)
+        {
+            if (!string.IsNullOrWhiteSpace(requestedName))
+            {
+                return requestedName.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(Environment.UserName))
+            {
+                return Environment.UserName;
+            }
+
+            return "Developer";
         }
 
         private static Font CreateFont(float size, FontStyle style)
@@ -970,19 +994,22 @@ namespace MbsTerminalSetup
             Panel page = CreateWideWizardPage();
             AddPageControl(page, CreateSummaryGrid("Profile", "Terminal theme, PowerShell profile helpers, icons, Starship config, and Windows Terminal settings."), 22, 22);
 
+            AddPageControl(page, CreateTextField("Display name for terminal welcome", ResolveDisplayName(options.DisplayName), out displayNameBox), 22, 126);
+            displayNameBox.TextChanged += delegate { UpdateReviewSummary(); };
+
             currentUserScopeBox = CreateOptionRow(
                 "Install for current user",
                 "Recommended. Updates tools and PATH for this Windows account.",
                 !string.Equals(options.InstallScope, "AllUsers", StringComparison.OrdinalIgnoreCase)
             );
-            AddPageControl(page, currentUserScopeBox.Parent, 22, 126);
+            AddPageControl(page, currentUserScopeBox.Parent, 22, 216);
 
             allUsersScopeBox = CreateOptionRow(
                 "Install for all users",
                 "Uses machine scope where supported. Administrator rights may be required.",
                 string.Equals(options.InstallScope, "AllUsers", StringComparison.OrdinalIgnoreCase)
             );
-            AddPageControl(page, allUsersScopeBox.Parent, 22, 204);
+            AddPageControl(page, allUsersScopeBox.Parent, 22, 294);
 
             currentUserScopeBox.CheckedChanged += ScopeOptionChanged;
             allUsersScopeBox.CheckedChanged += ScopeOptionChanged;
@@ -1239,6 +1266,39 @@ namespace MbsTerminalSetup
             }
 
             return string.Empty;
+        }
+
+        private static Control CreateTextField(string title, string value, out TextBox textBox)
+        {
+            Panel panel = new Panel();
+            panel.Width = WizardContentWidth;
+            panel.Height = 78;
+            panel.Margin = new Padding(0, 0, 0, 12);
+            panel.BackColor = Color.FromArgb(9, 10, 15);
+
+            Label label = CreateFloatingLabel(title, 8.8F, FontStyle.Bold, TextColor, 0, 0, 460, 22);
+            panel.Controls.Add(label);
+
+            RoundedPanel field = new RoundedPanel();
+            field.Location = new Point(0, 28);
+            field.Size = new Size(500, 42);
+            field.FillColor = FieldColor;
+            field.BorderColor = BorderColor;
+            field.Radius = 7;
+            field.BackColor = panel.BackColor;
+
+            textBox = new TextBox();
+            textBox.BackColor = FieldColor;
+            textBox.BorderStyle = BorderStyle.None;
+            textBox.Font = CreateFont(9.5F, FontStyle.Regular);
+            textBox.ForeColor = TextColor;
+            textBox.Location = new Point(14, 13);
+            textBox.Size = new Size(470, 19);
+            textBox.Text = value;
+            field.Controls.Add(textBox);
+
+            panel.Controls.Add(field);
+            return panel;
         }
 
         private static Control CreatePathPicker(string title, string value, EventHandler browseHandler, out TextBox textBox)
@@ -1659,6 +1719,7 @@ namespace MbsTerminalSetup
 
             StringBuilder summary = new StringBuilder();
             summary.AppendLine("Terminal profile");
+            summary.AppendLine("  Display name:       " + CleanValue(displayNameBox.Text, Environment.UserName));
             summary.AppendLine("  Install scope:      " + GetInstallScopeLabel());
             summary.AppendLine("  Starting directory: " + CleanValue(startingDirectoryBox.Text, "User profile"));
             summary.AppendLine("  Starship install:   " + YesNo(installStarshipBox.Checked));
@@ -1756,6 +1817,11 @@ namespace MbsTerminalSetup
             {
                 startingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
                 startingDirectoryBox.Text = startingDirectory;
+            }
+
+            if (string.IsNullOrWhiteSpace(displayNameBox.Text))
+            {
+                displayNameBox.Text = ResolveDisplayName(string.Empty);
             }
 
             currentStep = StepCount - 1;
@@ -1909,6 +1975,7 @@ namespace MbsTerminalSetup
         {
             AppendLog("Selected setup:", MutedTextColor);
             AppendLog("  Terminal profile: yes", MutedTextColor);
+            AppendLog("  Display name: " + CleanValue(displayNameBox.Text, Environment.UserName), MutedTextColor);
             AppendLog("  Install scope: " + GetInstallScopeLabel(), MutedTextColor);
             AppendLog("  Starting directory: " + CleanValue(startingDirectoryBox.Text, "User profile"), MutedTextColor);
 
@@ -1975,6 +2042,8 @@ namespace MbsTerminalSetup
             arguments.Add(Quote(startingDirectory));
             arguments.Add("-InstallScope");
             arguments.Add(GetInstallScopeArgument());
+            arguments.Add("-DisplayName");
+            arguments.Add(Quote(CleanValue(displayNameBox.Text, Environment.UserName)));
 
             if (installStarshipBox.Checked)
             {

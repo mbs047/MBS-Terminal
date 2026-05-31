@@ -1,4 +1,5 @@
 $script:MbsPortfolioPath = 'W:\GitHub\MBS-Portfolio'
+$script:MbsDisplayName = '__MBS_DISPLAY_NAME__'
 $script:LaravelArtisanCommandCache = @{}
 $script:ComposerScriptsCache = @{}
 $script:NpmScriptsCache = @{}
@@ -887,10 +888,15 @@ function Show-MbsWelcome {
 
     $quote = Get-Random -InputObject $quotes
     $currentPath = Split-Path -Path (Get-Location).ProviderPath -Leaf
+    $displayName = $script:MbsDisplayName
+
+    if ([string]::IsNullOrWhiteSpace($displayName) -or $displayName -eq '__MBS_DISPLAY_NAME__') {
+        $displayName = $env:USERNAME
+    }
 
     Write-Host ''
     Write-Host '+----------------------------------------------------------+' -ForegroundColor DarkMagenta
-    Write-Host ("  {0}, Mohammed. Ready to build {1}." -f $greeting, $currentPath) -ForegroundColor Cyan
+    Write-Host ("  {0}, {1}. Ready to build {2}." -f $greeting, $displayName, $currentPath) -ForegroundColor Cyan
     Write-Host ("  Quote: {0}" -f $quote) -ForegroundColor DarkYellow
     Write-Host '+----------------------------------------------------------+' -ForegroundColor DarkMagenta
     Write-Host ''

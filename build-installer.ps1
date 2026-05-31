@@ -20,7 +20,14 @@ if (-not $compiler) {
 $source = Join-Path $repositoryRoot 'src\MbsTerminalSetup.cs'
 $output = Join-Path $repositoryRoot 'MBS-Terminal-Setup.exe'
 
-& $compiler /nologo /optimize+ /target:exe "/out:$output" $source
+& $compiler `
+    /nologo `
+    /optimize+ `
+    /target:winexe `
+    /reference:System.Drawing.dll `
+    /reference:System.Windows.Forms.dll `
+    "/out:$output" `
+    $source
 
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE

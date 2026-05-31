@@ -448,6 +448,43 @@ function Remove-ComposerGlobalPackageIfInstalled {
     }
 }
 
+function Invoke-ValetInstall {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ValetCommand
+    )
+
+    Write-Step 'Running valet install.'
+    $output = @(& $ValetCommand install --no-ansi --no-interaction 2>&1)
+    $exitCode = $LASTEXITCODE
+    $outputText = $output -join [Environment]::NewLine
+    $hasSuccessMarker = $outputText -match 'Valet installed and started successfully'
+    $hasKnownReturnCodeIssue = $outputText -match 'must return an integer value' -and $outputText -match '"?null"? was returned'
+
+    foreach ($entry in $output) {
+        $line = [string] $entry
+
+        if ($hasSuccessMarker -and ($line -match 'PHP Fatal error:' -or $line -match 'Stack trace:' -or $line -match 'InvokableCommand\.php' -or $line -match '^\s*#\d+ ' -or $line -match '^\s*thrown in ')) {
+            continue
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($line)) {
+            Write-Host $line
+        }
+    }
+
+    if ($exitCode -eq 0) {
+        return $true
+    }
+
+    if ($hasSuccessMarker -and $hasKnownReturnCodeIssue) {
+        Write-SoftWarning 'Valet install completed, then returned a known Symfony console exit-code warning. Continuing because Valet reported success.'
+        return $true
+    }
+
+    throw "Running valet install. failed with exit code $exitCode."
+}
+
 function Install-LaravelIfRequested {
     if (-not $InstallLaravel) {
         return
@@ -490,7 +527,7 @@ function Install-ValetIfRequested {
     }
 
     try {
-        Invoke-ExternalCommand -FilePath $valetCommand -Arguments @('install') -Description 'Running valet install.'
+        [void](Invoke-ValetInstall -ValetCommand $valetCommand)
     } catch {
         Write-SoftWarning "Valet package installed, but valet install did not complete. $($_.Exception.Message)"
     }

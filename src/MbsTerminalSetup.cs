@@ -230,6 +230,8 @@ namespace MbsTerminalSetup
         private static readonly Color AccentAltColor = Color.FromArgb(34, 211, 238);
         private static readonly Color WarningColor = Color.FromArgb(245, 158, 11);
         private static readonly Color DangerColor = Color.FromArgb(239, 68, 68);
+        private static readonly Color DisabledTextColor = Color.FromArgb(126, 132, 148);
+        private static readonly Color DisabledSurfaceColor = Color.FromArgb(18, 18, 25);
 
         private readonly string repositoryRoot;
         private readonly string installerPath;
@@ -837,24 +839,7 @@ namespace MbsTerminalSetup
                 step.Padding = new Padding(38, 0, 8, 0);
                 step.Font = CreateFont(9F, FontStyle.Bold);
                 step.Text = stepTitles[index];
-                step.Cursor = Cursors.Hand;
-                int capturedIndex = index;
-                EventHandler stepClick = delegate
-                {
-                    if (IsInstalling() || (capturedIndex == StepCount - 1 && !installHasRun))
-                    {
-                        return;
-                    }
-
-                    if (!TermsAccepted() && capturedIndex > 0)
-                    {
-                        return;
-                    }
-
-                    currentStep = capturedIndex;
-                    UpdateWizard();
-                };
-                step.Click += stepClick;
+                step.Cursor = Cursors.Default;
 
                 Label dot = new Label();
                 dot.AutoSize = false;
@@ -863,8 +848,7 @@ namespace MbsTerminalSetup
                 dot.TextAlign = ContentAlignment.MiddleCenter;
                 dot.Font = CreateFont(8F, FontStyle.Bold);
                 dot.Text = (index + 1).ToString();
-                dot.Cursor = Cursors.Hand;
-                dot.Click += stepClick;
+                dot.Cursor = Cursors.Default;
 
                 stepLabels[index] = step;
                 stepHost.Controls.Add(dot);
@@ -1036,6 +1020,7 @@ namespace MbsTerminalSetup
             );
             AddPageControl(page, installPhpBox.Parent, 22, 126);
             AddPageControl(page, CreatePathPicker("Existing PHP directory", options.PhpDirectory ?? string.Empty, BrowsePhpDirectoryClick, out phpDirectoryBox), 560, 22);
+            AddPageControl(page, CreateNoteCard("Optional: select the folder that contains php.exe if PHP is already installed through Laragon, XAMPP, Herd, or a custom build."), 560, 112);
             installComposerBox = CreateOptionRow(
                 "Install Composer",
                 "Downloads Composer-Setup.exe and runs it silently with your PHP selection.",
@@ -1498,33 +1483,48 @@ namespace MbsTerminalSetup
         private static Button CreatePrimaryButton(string text)
         {
             Button button = CreateButton(text);
-            button.BackColor = AccentColor;
-            button.ForeColor = Color.White;
-            button.FlatAppearance.BorderColor = AccentColor;
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(139, 92, 246);
-            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(91, 33, 182);
+            ApplyButtonPalette(
+                button,
+                new ButtonPalette(
+                    AccentColor,
+                    Color.White,
+                    AccentColor,
+                    Color.FromArgb(139, 92, 246),
+                    Color.FromArgb(91, 33, 182)
+                )
+            );
             return button;
         }
 
         private static Button CreateSecondaryButton(string text)
         {
             Button button = CreateButton(text);
-            button.BackColor = SurfaceAltColor;
-            button.ForeColor = TextColor;
-            button.FlatAppearance.BorderColor = BorderColor;
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(29, 30, 40);
-            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(18, 19, 27);
+            ApplyButtonPalette(
+                button,
+                new ButtonPalette(
+                    SurfaceAltColor,
+                    TextColor,
+                    BorderColor,
+                    Color.FromArgb(29, 30, 40),
+                    Color.FromArgb(18, 19, 27)
+                )
+            );
             return button;
         }
 
         private static Button CreateTextButton(string text)
         {
             Button button = CreateButton(text);
-            button.BackColor = SurfaceColor;
-            button.ForeColor = MutedTextColor;
-            button.FlatAppearance.BorderColor = BorderColor;
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(18, 19, 27);
-            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(12, 13, 19);
+            ApplyButtonPalette(
+                button,
+                new ButtonPalette(
+                    SurfaceColor,
+                    MutedTextColor,
+                    BorderColor,
+                    Color.FromArgb(18, 19, 27),
+                    Color.FromArgb(12, 13, 19)
+                )
+            );
             return button;
         }
 
@@ -1541,6 +1541,41 @@ namespace MbsTerminalSetup
             button.Cursor = Cursors.Hand;
             button.UseVisualStyleBackColor = false;
             return button;
+        }
+
+        private static void ApplyButtonPalette(Button button, ButtonPalette palette)
+        {
+            button.Tag = palette;
+            ApplyButtonEnabledState(button);
+            button.EnabledChanged += delegate { ApplyButtonEnabledState(button); };
+        }
+
+        private static void ApplyButtonEnabledState(Button button)
+        {
+            ButtonPalette palette = button.Tag as ButtonPalette;
+
+            if (palette == null)
+            {
+                return;
+            }
+
+            if (button.Enabled)
+            {
+                button.BackColor = palette.BackColor;
+                button.ForeColor = palette.ForeColor;
+                button.FlatAppearance.BorderColor = palette.BorderColor;
+                button.FlatAppearance.MouseOverBackColor = palette.HoverColor;
+                button.FlatAppearance.MouseDownBackColor = palette.DownColor;
+                button.Cursor = Cursors.Hand;
+                return;
+            }
+
+            button.BackColor = DisabledSurfaceColor;
+            button.ForeColor = DisabledTextColor;
+            button.FlatAppearance.BorderColor = Color.FromArgb(48, 50, 62);
+            button.FlatAppearance.MouseOverBackColor = DisabledSurfaceColor;
+            button.FlatAppearance.MouseDownBackColor = DisabledSurfaceColor;
+            button.Cursor = Cursors.Default;
         }
 
         private void ToolingOptionChanged(object sender, EventArgs e)
@@ -2435,6 +2470,24 @@ namespace MbsTerminalSetup
             path.CloseFigure();
             return path;
         }
+    }
+
+    internal sealed class ButtonPalette
+    {
+        public ButtonPalette(Color backColor, Color foreColor, Color borderColor, Color hoverColor, Color downColor)
+        {
+            BackColor = backColor;
+            ForeColor = foreColor;
+            BorderColor = borderColor;
+            HoverColor = hoverColor;
+            DownColor = downColor;
+        }
+
+        public Color BackColor { get; private set; }
+        public Color ForeColor { get; private set; }
+        public Color BorderColor { get; private set; }
+        public Color HoverColor { get; private set; }
+        public Color DownColor { get; private set; }
     }
 
     internal sealed class HeaderPanel : Panel

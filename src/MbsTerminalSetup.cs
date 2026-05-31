@@ -37,6 +37,7 @@ namespace MbsTerminalSetup
         public bool InstallLaravel { get; set; }
         public bool InstallValet { get; set; }
         public bool UpdateTools { get; set; }
+        public string InstallScope { get; set; }
 
         public static InstallerOptions FromArgs(string[] args)
         {
@@ -93,7 +94,22 @@ namespace MbsTerminalSetup
                 {
                     options.PhpDirectory = args[index + 1];
                     index++;
+                    continue;
                 }
+
+                if (IsSwitch(argument, "InstallScope") && index + 1 < args.Length)
+                {
+                    string installScope = args[index + 1];
+                    options.InstallScope = string.Equals(installScope, "AllUsers", StringComparison.OrdinalIgnoreCase)
+                        ? "AllUsers"
+                        : "CurrentUser";
+                    index++;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(options.InstallScope))
+            {
+                options.InstallScope = "CurrentUser";
             }
 
             return options;
@@ -111,18 +127,18 @@ namespace MbsTerminalSetup
         private const int WizardContentWidth = 520;
         private const int StepCount = 5;
 
-        private static readonly Color BackgroundColor = Color.FromArgb(15, 23, 42);
-        private static readonly Color HeaderStartColor = Color.FromArgb(8, 14, 26);
-        private static readonly Color HeaderEndColor = Color.FromArgb(19, 58, 72);
-        private static readonly Color SurfaceColor = Color.FromArgb(27, 35, 54);
-        private static readonly Color SurfaceAltColor = Color.FromArgb(39, 47, 66);
-        private static readonly Color SelectedSurfaceColor = Color.FromArgb(24, 48, 49);
-        private static readonly Color FieldColor = Color.FromArgb(12, 19, 34);
-        private static readonly Color BorderColor = Color.FromArgb(71, 85, 105);
-        private static readonly Color TextColor = Color.FromArgb(248, 250, 252);
-        private static readonly Color MutedTextColor = Color.FromArgb(148, 163, 184);
-        private static readonly Color AccentColor = Color.FromArgb(34, 197, 94);
-        private static readonly Color AccentAltColor = Color.FromArgb(59, 130, 246);
+        private static readonly Color BackgroundColor = Color.FromArgb(224, 238, 248);
+        private static readonly Color HeaderStartColor = Color.FromArgb(255, 255, 255);
+        private static readonly Color HeaderEndColor = Color.FromArgb(239, 246, 255);
+        private static readonly Color SurfaceColor = Color.FromArgb(255, 255, 255);
+        private static readonly Color SurfaceAltColor = Color.FromArgb(246, 248, 252);
+        private static readonly Color SelectedSurfaceColor = Color.FromArgb(247, 242, 255);
+        private static readonly Color FieldColor = Color.FromArgb(255, 255, 255);
+        private static readonly Color BorderColor = Color.FromArgb(213, 221, 234);
+        private static readonly Color TextColor = Color.FromArgb(15, 23, 42);
+        private static readonly Color MutedTextColor = Color.FromArgb(93, 106, 130);
+        private static readonly Color AccentColor = Color.FromArgb(111, 42, 179);
+        private static readonly Color AccentAltColor = Color.FromArgb(14, 165, 233);
         private static readonly Color WarningColor = Color.FromArgb(245, 158, 11);
         private static readonly Color DangerColor = Color.FromArgb(239, 68, 68);
 
@@ -158,7 +174,14 @@ namespace MbsTerminalSetup
 
         private TextBox startingDirectoryBox;
         private TextBox phpDirectoryBox;
+        private TableLayoutPanel bodyLayout;
+        private Panel wizardPanel;
+        private Panel runPanel;
+        private AnimatedAccentPanel runningVisualPanel;
+        private Timer animationTimer;
         private ModernCheckBox installStarshipBox;
+        private ModernCheckBox currentUserScopeBox;
+        private ModernCheckBox allUsersScopeBox;
         private ModernCheckBox installPhpBox;
         private ModernCheckBox installComposerBox;
         private ModernCheckBox installLaravelBox;
@@ -183,6 +206,7 @@ namespace MbsTerminalSetup
         private Process installerProcess;
         private int currentStep;
         private bool installHasRun;
+        private bool syncingScopeOptions;
 
         public InstallerForm(InstallerOptions options)
         {
@@ -193,8 +217,8 @@ namespace MbsTerminalSetup
             ExitCode = 0;
             Text = "MBS Terminal Setup";
             StartPosition = FormStartPosition.CenterScreen;
-            MinimumSize = new Size(1180, 760);
-            Size = new Size(1240, 820);
+            MinimumSize = new Size(1100, 760);
+            Size = new Size(1180, 820);
             BackColor = BackgroundColor;
             ForeColor = TextColor;
             Font = CreateFont(9F, FontStyle.Regular);
@@ -206,11 +230,11 @@ namespace MbsTerminalSetup
             HeaderPanel header = CreateHeader();
             shell.Controls.Add(header, 0, 0);
 
-            TableLayoutPanel body = CreateBodyLayout();
-            shell.Controls.Add(body, 0, 1);
+            bodyLayout = CreateBodyLayout();
+            shell.Controls.Add(bodyLayout, 0, 1);
 
-            Panel wizardPanel = CreatePanel();
-            body.Controls.Add(wizardPanel, 0, 0);
+            wizardPanel = CreatePanel();
+            bodyLayout.Controls.Add(wizardPanel, 0, 0);
 
             TableLayoutPanel wizardLayout = CreateWizardLayout();
             wizardPanel.Controls.Add(wizardLayout);
@@ -223,13 +247,13 @@ namespace MbsTerminalSetup
             titlePanel.Margin = new Padding(22, 8, 22, 0);
             wizardTitleLabel = CreateLabel(string.Empty, 20F, FontStyle.Bold, TextColor);
             wizardTitleLabel.Location = new Point(0, 0);
-            wizardTitleLabel.Size = new Size(WizardContentWidth, 36);
+            wizardTitleLabel.Size = new Size(980, 34);
             wizardTitleLabel.Dock = DockStyle.None;
             titlePanel.Controls.Add(wizardTitleLabel);
 
             wizardDescriptionLabel = CreateLabel(string.Empty, 9.5F, FontStyle.Regular, MutedTextColor);
-            wizardDescriptionLabel.Location = new Point(0, 38);
-            wizardDescriptionLabel.Size = new Size(WizardContentWidth, 28);
+            wizardDescriptionLabel.Location = new Point(0, 34);
+            wizardDescriptionLabel.Size = new Size(980, 28);
             wizardDescriptionLabel.Dock = DockStyle.None;
             titlePanel.Controls.Add(wizardDescriptionLabel);
             wizardLayout.Controls.Add(titlePanel, 0, 1);
@@ -237,8 +261,8 @@ namespace MbsTerminalSetup
             RoundedPanel wizardHost = new RoundedPanel();
             wizardHost.Dock = DockStyle.Fill;
             wizardHost.Margin = new Padding(22, 10, 22, 12);
-            wizardHost.FillColor = Color.FromArgb(21, 30, 47);
-            wizardHost.BorderColor = Color.FromArgb(54, 68, 91);
+            wizardHost.FillColor = Color.FromArgb(250, 252, 255);
+            wizardHost.BorderColor = BorderColor;
             wizardHost.Radius = 8;
             wizardHost.Padding = new Padding(1);
             wizardLayout.Controls.Add(wizardHost, 0, 2);
@@ -258,8 +282,8 @@ namespace MbsTerminalSetup
 
             wizardLayout.Controls.Add(CreateWizardNav(), 0, 3);
 
-            Panel runPanel = CreatePanel();
-            body.Controls.Add(runPanel, 1, 0);
+            runPanel = CreatePanel();
+            bodyLayout.Controls.Add(runPanel, 1, 0);
 
             TableLayoutPanel runLayout = CreateRunLayout();
             runPanel.Controls.Add(runLayout);
@@ -284,20 +308,21 @@ namespace MbsTerminalSetup
             trustPanel.Controls.Add(CreateStatusBadge("Backups"));
             trustPanel.Controls.Add(CreateStatusBadge("PATH updates"));
             trustPanel.Controls.Add(CreateStatusBadge("Hidden shell"));
-            runLayout.Controls.Add(trustPanel, 0, 2);
+
+            runningVisualPanel = new AnimatedAccentPanel();
+            runningVisualPanel.Dock = DockStyle.Fill;
+            runningVisualPanel.Margin = new Padding(0, 4, 0, 14);
+            runningVisualPanel.StatusText = "Now installing...";
+            runningVisualPanel.Font = CreateFont(14F, FontStyle.Bold);
+            runLayout.Controls.Add(runningVisualPanel, 0, 2);
 
             actionPanel = new FlowLayoutPanel();
             actionPanel.Dock = DockStyle.Fill;
             actionPanel.FlowDirection = FlowDirection.LeftToRight;
             actionPanel.WrapContents = false;
             actionPanel.BackColor = SurfaceColor;
-            actionPanel.Margin = new Padding(0, 4, 0, 12);
+            actionPanel.Margin = new Padding(0, 4, 0, 10);
             runLayout.Controls.Add(actionPanel, 0, 3);
-
-            installButton = CreatePrimaryButton("Install");
-            installButton.Width = 136;
-            installButton.Click += InstallButtonClick;
-            actionPanel.Controls.Add(installButton);
 
             cancelButton = CreateSecondaryButton("Cancel");
             cancelButton.Width = 118;
@@ -324,8 +349,8 @@ namespace MbsTerminalSetup
             runLayout.Controls.Add(guidePanel, 0, 6);
 
             logBox = new RichTextBox();
-            logBox.BackColor = Color.FromArgb(6, 10, 17);
-            logBox.BorderStyle = BorderStyle.None;
+            logBox.BackColor = Color.FromArgb(248, 250, 252);
+            logBox.BorderStyle = BorderStyle.FixedSingle;
             logBox.Dock = DockStyle.Fill;
             logBox.ForeColor = TextColor;
             logBox.Font = CreateMonoFont(9F);
@@ -338,6 +363,19 @@ namespace MbsTerminalSetup
             installValetBox.CheckedChanged += ToolingOptionChanged;
 
             FormClosing += InstallerFormClosing;
+
+            animationTimer = new Timer();
+            animationTimer.Interval = 33;
+            animationTimer.Tick += delegate
+            {
+                if (runningVisualPanel != null && runningVisualPanel.Visible)
+                {
+                    runningVisualPanel.Phase += 0.035F;
+                    runningVisualPanel.IsRunning = IsInstalling();
+                    runningVisualPanel.Invalidate();
+                }
+            };
+            animationTimer.Start();
 
             AppendLog("Wizard ready. Configure each step, then install.", MutedTextColor);
             AppendLog("Tip: if you already use Laragon, XAMPP, or a custom PHP build, select its PHP folder instead of installing PHP.", MutedTextColor);
@@ -445,7 +483,7 @@ namespace MbsTerminalSetup
             shell.BackColor = BackgroundColor;
             shell.ColumnCount = 1;
             shell.RowCount = 2;
-            shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 162F));
+            shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 136F));
             shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             return shell;
         }
@@ -456,13 +494,13 @@ namespace MbsTerminalSetup
             header.Dock = DockStyle.Fill;
             header.StartColor = HeaderStartColor;
             header.EndColor = HeaderEndColor;
-            header.Padding = new Padding(30, 24, 30, 24);
+            header.Padding = new Padding(30, 20, 30, 18);
 
             PictureBox icon = new PictureBox();
             icon.BackColor = Color.Transparent;
             icon.SizeMode = PictureBoxSizeMode.Zoom;
-            icon.Location = new Point(32, 32);
-            icon.Size = new Size(82, 82);
+            icon.Location = new Point(34, 28);
+            icon.Size = new Size(72, 72);
 
             if (File.Exists(iconPath))
             {
@@ -471,13 +509,13 @@ namespace MbsTerminalSetup
 
             header.Controls.Add(icon);
 
-            header.Controls.Add(CreateFloatingLabel("MBS TERMINAL / DEV TOOLCHAIN", 9F, FontStyle.Bold, Color.FromArgb(194, 239, 226), 132, 30, 520, 24));
-            header.Controls.Add(CreateFloatingLabel("Laravel Ready Wizard", 31F, FontStyle.Bold, Color.White, 128, 54, 600, 54));
-            header.Controls.Add(CreateFloatingLabel("A staged desktop setup for your terminal profile, PHP runtime, Composer, Laravel, and Valet for Windows.", 10.5F, FontStyle.Regular, Color.FromArgb(216, 227, 238), 132, 108, 840, 28));
+            header.Controls.Add(CreateFloatingLabel("MBS TERMINAL / DEV TOOLCHAIN", 8.8F, FontStyle.Bold, AccentColor, 128, 26, 520, 22));
+            header.Controls.Add(CreateFloatingLabel("Laravel Ready Wizard", 27F, FontStyle.Bold, TextColor, 126, 48, 600, 48));
+            header.Controls.Add(CreateFloatingLabel("A staged desktop setup for Windows Terminal, PHP, Composer, Laravel, and Valet for Windows.", 10F, FontStyle.Regular, MutedTextColor, 128, 94, 820, 24));
 
-            AddPill(header, "Dark Minimal", 790, 40, AccentColor);
-            AddPill(header, "Wizard Flow", 910, 40, AccentAltColor);
-            AddPill(header, "WCAG AA", 1030, 40, WarningColor);
+            AddPill(header, "Modern UI", 750, 38, AccentColor);
+            AddPill(header, "Hidden Shell", 860, 38, AccentAltColor);
+            AddPill(header, "Animated Run", 984, 38, WarningColor);
 
             return header;
         }
@@ -490,7 +528,7 @@ namespace MbsTerminalSetup
             pill.TextAlign = ContentAlignment.MiddleCenter;
             pill.Font = CreateFont(8.5F, FontStyle.Bold);
             pill.BackColor = Color.FromArgb(42, color);
-            pill.ForeColor = Color.White;
+            pill.ForeColor = TextColor;
             pill.Location = new Point(left, top);
             pill.Size = new Size(Math.Max(62, text.Length * 9 + 26), 30);
             parent.Controls.Add(pill);
@@ -504,8 +542,8 @@ namespace MbsTerminalSetup
             body.ColumnCount = 2;
             body.RowCount = 1;
             body.Padding = new Padding(18);
-            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52F));
-            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48F));
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 0F));
             body.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             return body;
         }
@@ -530,10 +568,10 @@ namespace MbsTerminalSetup
             layout.RowCount = 4;
             layout.Dock = DockStyle.Fill;
             layout.BackColor = SurfaceColor;
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 92F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 84F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 76F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 72F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 62F));
             return layout;
         }
 
@@ -544,7 +582,7 @@ namespace MbsTerminalSetup
             stepper.RowCount = 1;
             stepper.Dock = DockStyle.Fill;
             stepper.BackColor = SurfaceColor;
-            stepper.Padding = new Padding(22, 20, 22, 8);
+            stepper.Padding = new Padding(22, 16, 22, 8);
 
             for (int index = 0; index < StepCount; index++)
             {
@@ -585,11 +623,11 @@ namespace MbsTerminalSetup
             layout.BackColor = SurfaceColor;
             layout.Padding = new Padding(22);
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 60F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 260F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             return layout;
         }
@@ -611,92 +649,111 @@ namespace MbsTerminalSetup
 
         private Control CreateProfilePage(InstallerOptions options)
         {
-            FlowLayoutPanel page = CreateWizardPage();
-            page.Controls.Add(CreateSummaryGrid("Profile", "Terminal theme, PowerShell profile helpers, icons, Starship config, and Windows Terminal settings."));
-            page.Controls.Add(CreatePathPicker("Starting directory", ResolveStartingDirectory(options.StartingDirectory), BrowseStartingDirectoryClick, out startingDirectoryBox));
+            Panel page = CreateWideWizardPage();
+            AddPageControl(page, CreateSummaryGrid("Profile", "Terminal theme, PowerShell profile helpers, icons, Starship config, and Windows Terminal settings."), 22, 22);
+
+            currentUserScopeBox = CreateOptionRow(
+                "Install for current user",
+                "Recommended. Updates tools and PATH for this Windows account.",
+                !string.Equals(options.InstallScope, "AllUsers", StringComparison.OrdinalIgnoreCase)
+            );
+            AddPageControl(page, currentUserScopeBox.Parent, 22, 126);
+
+            allUsersScopeBox = CreateOptionRow(
+                "Install for all users",
+                "Uses machine scope where supported. Administrator rights may be required.",
+                string.Equals(options.InstallScope, "AllUsers", StringComparison.OrdinalIgnoreCase)
+            );
+            AddPageControl(page, allUsersScopeBox.Parent, 22, 204);
+
+            currentUserScopeBox.CheckedChanged += ScopeOptionChanged;
+            allUsersScopeBox.CheckedChanged += ScopeOptionChanged;
+
+            AddPageControl(page, CreatePathPicker("Starting directory (new terminal tabs open here)", ResolveStartingDirectory(options.StartingDirectory), BrowseStartingDirectoryClick, out startingDirectoryBox), 560, 22);
+            AddPageControl(page, CreateNoteCard("This sets where the MBS Terminal profile opens by default. Pick your project folder, or leave the user profile default."), 560, 112);
             installStarshipBox = CreateOptionRow(
                 "Install missing Starship with winget",
                 "Keeps the terminal prompt fully themed when Starship is not already installed.",
                 options.InstallDependencies
             );
-            page.Controls.Add(installStarshipBox.Parent);
+            AddPageControl(page, installStarshipBox.Parent, 560, 192);
             return page;
         }
 
         private Control CreateRuntimePage(InstallerOptions options)
         {
-            FlowLayoutPanel page = CreateWizardPage();
-            page.Controls.Add(CreateSummaryGrid("Runtime", "Choose how PHP and Composer should be prepared for Laravel tooling."));
+            Panel page = CreateWideWizardPage();
+            AddPageControl(page, CreateSummaryGrid("Runtime", "Choose how PHP and Composer should be prepared for Laravel tooling."), 22, 22);
             installPhpBox = CreateOptionRow(
                 "Install PHP 8.4",
                 "Uses winget package PHP.PHP.8.4.",
                 options.InstallPhp
             );
-            page.Controls.Add(installPhpBox.Parent);
-            page.Controls.Add(CreatePathPicker("Existing PHP directory", options.PhpDirectory ?? string.Empty, BrowsePhpDirectoryClick, out phpDirectoryBox));
+            AddPageControl(page, installPhpBox.Parent, 22, 126);
+            AddPageControl(page, CreatePathPicker("Existing PHP directory", options.PhpDirectory ?? string.Empty, BrowsePhpDirectoryClick, out phpDirectoryBox), 560, 22);
             installComposerBox = CreateOptionRow(
                 "Install Composer",
                 "Downloads Composer-Setup.exe and runs it silently with your PHP selection.",
                 options.InstallComposer
             );
-            page.Controls.Add(installComposerBox.Parent);
+            AddPageControl(page, installComposerBox.Parent, 22, 204);
             return page;
         }
 
         private Control CreateLaravelPage(InstallerOptions options)
         {
-            FlowLayoutPanel page = CreateWizardPage();
-            page.Controls.Add(CreateSummaryGrid("Tooling", "Install global developer tools after Composer is ready."));
-            page.Controls.Add(CreateDetectedToolsCard());
+            Panel page = CreateWideWizardPage();
+            AddPageControl(page, CreateSummaryGrid("Tooling", "Install global developer tools after Composer is ready."), 22, 22);
+            AddPageControl(page, CreateDetectedToolsCard(), 22, 126);
             updateToolsBox = CreateOptionRow(
                 "Update tooling that is already installed",
                 "Refreshes PHP with winget and Composer with self-update when selected.",
                 options.UpdateTools
             );
-            page.Controls.Add(updateToolsBox.Parent);
+            AddPageControl(page, updateToolsBox.Parent, 22, 220);
             installLaravelBox = CreateOptionRow(
                 "Install Laravel Installer",
                 "Runs composer global require laravel/installer.",
                 options.InstallLaravel
             );
-            page.Controls.Add(installLaravelBox.Parent);
+            AddPageControl(page, installLaravelBox.Parent, 560, 22);
             installValetBox = CreateOptionRow(
                 "Install Valet for Windows",
                 "Runs composer global require ycodetech/valet-windows, then valet install.",
                 options.InstallValet
             );
-            page.Controls.Add(installValetBox.Parent);
-            page.Controls.Add(CreateNoteCard("Composer will be selected automatically when Laravel Installer or Valet is enabled."));
+            AddPageControl(page, installValetBox.Parent, 560, 100);
+            AddPageControl(page, CreateNoteCard("Composer will be selected automatically when Laravel Installer or Valet is enabled."), 560, 190);
             return page;
         }
 
         private Control CreateReviewPage()
         {
-            FlowLayoutPanel page = CreateWizardPage();
-            page.Controls.Add(CreateSummaryGrid("Review", "Confirm the exact command plan before anything changes on the machine."));
+            Panel page = CreateWideWizardPage();
+            AddPageControl(page, CreateSummaryGrid("Review", "Confirm the exact command plan before anything changes on the machine."), 22, 22);
 
             RoundedPanel reviewCard = new RoundedPanel();
             reviewCard.Width = WizardContentWidth;
-            reviewCard.Height = 250;
+            reviewCard.Height = 300;
             reviewCard.Margin = new Padding(0, 0, 0, 12);
-            reviewCard.FillColor = FieldColor;
-            reviewCard.BorderColor = Color.FromArgb(54, 68, 91);
+            reviewCard.FillColor = Color.FromArgb(255, 255, 255);
+            reviewCard.BorderColor = BorderColor;
             reviewCard.Radius = 8;
-            reviewCard.BackColor = Color.FromArgb(21, 30, 47);
+            reviewCard.BackColor = Color.FromArgb(250, 252, 255);
 
-            reviewSummaryLabel = CreateFloatingLabel(string.Empty, 9.4F, FontStyle.Regular, TextColor, 18, 16, 480, 216);
-            reviewSummaryLabel.Font = CreateMonoFont(9.2F);
+            reviewSummaryLabel = CreateFloatingLabel(string.Empty, 9.1F, FontStyle.Regular, TextColor, 18, 14, 480, 270);
+            reviewSummaryLabel.Font = CreateMonoFont(8.9F);
             reviewSummaryLabel.TextAlign = ContentAlignment.TopLeft;
             reviewCard.Controls.Add(reviewSummaryLabel);
-            page.Controls.Add(reviewCard);
-            page.Controls.Add(CreateNoteCard("Click Install only when this summary matches what you want for this Windows machine."));
+            AddPageControl(page, reviewCard, 560, 22);
+            AddPageControl(page, CreateNoteCard("Click Install only when this summary matches what you want for this Windows machine."), 22, 126);
             return page;
         }
 
         private Control CreateRunningPage()
         {
             FlowLayoutPanel page = CreateWizardPage();
-            page.Controls.Add(CreateSummaryGrid("Running", "The installer is running separately now. Watch the log panel on the right for live output."));
+            page.Controls.Add(CreateSummaryGrid("Running", "PowerShell is hidden. The animated installer panel and log appear on this final step only."));
             page.Controls.Add(CreateNoteCard("You can cancel while the process is running. Closing the window will ask before stopping the installer."));
             return page;
         }
@@ -706,31 +763,46 @@ namespace MbsTerminalSetup
             FlowLayoutPanel page = new FlowLayoutPanel();
             page.FlowDirection = FlowDirection.TopDown;
             page.WrapContents = false;
-            page.AutoScroll = true;
-            page.BackColor = Color.FromArgb(21, 30, 47);
+            page.AutoScroll = false;
+            page.BackColor = Color.FromArgb(250, 252, 255);
             page.Padding = new Padding(22, 22, 22, 18);
             return page;
+        }
+
+        private static Panel CreateWideWizardPage()
+        {
+            Panel page = new Panel();
+            page.BackColor = Color.FromArgb(250, 252, 255);
+            page.AutoScroll = false;
+            return page;
+        }
+
+        private static void AddPageControl(Control page, Control control, int left, int top)
+        {
+            control.Location = new Point(left, top);
+            control.Margin = new Padding(0);
+            page.Controls.Add(control);
         }
 
         private static Control CreateSummaryGrid(string title, string body)
         {
             RoundedPanel card = new RoundedPanel();
             card.Width = WizardContentWidth;
-            card.Height = 92;
-            card.Margin = new Padding(0, 0, 0, 14);
-            card.FillColor = Color.FromArgb(18, 27, 43);
-            card.BorderColor = Color.FromArgb(54, 68, 91);
+            card.Height = 88;
+            card.Margin = new Padding(0, 0, 0, 12);
+            card.FillColor = Color.FromArgb(255, 255, 255);
+            card.BorderColor = BorderColor;
             card.Radius = 8;
-            card.BackColor = Color.FromArgb(21, 30, 47);
+            card.BackColor = Color.FromArgb(250, 252, 255);
 
             Panel accent = new Panel();
             accent.BackColor = AccentColor;
-            accent.Location = new Point(18, 20);
+            accent.Location = new Point(18, 18);
             accent.Size = new Size(4, 50);
             card.Controls.Add(accent);
 
-            card.Controls.Add(CreateFloatingLabel(title, 13F, FontStyle.Bold, TextColor, 34, 18, 450, 28));
-            card.Controls.Add(CreateFloatingLabel(body, 9F, FontStyle.Regular, MutedTextColor, 34, 48, 454, 34));
+            card.Controls.Add(CreateFloatingLabel(title, 13F, FontStyle.Bold, TextColor, 34, 16, 450, 28));
+            card.Controls.Add(CreateFloatingLabel(body, 9F, FontStyle.Regular, MutedTextColor, 34, 46, 454, 34));
             return card;
         }
 
@@ -738,13 +810,13 @@ namespace MbsTerminalSetup
         {
             RoundedPanel card = new RoundedPanel();
             card.Width = WizardContentWidth;
-            card.Height = 72;
+            card.Height = 66;
             card.Margin = new Padding(0, 0, 0, 12);
-            card.FillColor = Color.FromArgb(28, 47, 58);
-            card.BorderColor = Color.FromArgb(53, 88, 104);
+            card.FillColor = Color.FromArgb(239, 246, 255);
+            card.BorderColor = Color.FromArgb(191, 219, 254);
             card.Radius = 8;
-            card.BackColor = Color.FromArgb(21, 30, 47);
-            card.Controls.Add(CreateFloatingLabel(text, 9.2F, FontStyle.Regular, Color.FromArgb(210, 232, 238), 18, 14, 480, 40));
+            card.BackColor = Color.FromArgb(250, 252, 255);
+            card.Controls.Add(CreateFloatingLabel(text, 9.2F, FontStyle.Regular, Color.FromArgb(30, 64, 120), 18, 12, 480, 40));
             return card;
         }
 
@@ -752,15 +824,15 @@ namespace MbsTerminalSetup
         {
             RoundedPanel card = new RoundedPanel();
             card.Width = WizardContentWidth;
-            card.Height = 96;
+            card.Height = 82;
             card.Margin = new Padding(0, 0, 0, 12);
-            card.FillColor = Color.FromArgb(55, 43, 25);
-            card.BorderColor = Color.FromArgb(135, 94, 38);
+            card.FillColor = Color.FromArgb(255, 251, 235);
+            card.BorderColor = Color.FromArgb(245, 158, 11);
             card.Radius = 8;
-            card.BackColor = Color.FromArgb(21, 30, 47);
+            card.BackColor = Color.FromArgb(250, 252, 255);
 
-            card.Controls.Add(CreateFloatingLabel("Detected installed tooling", 10.2F, FontStyle.Bold, WarningColor, 18, 12, 460, 24));
-            card.Controls.Add(CreateFloatingLabel(BuildDetectedToolsMessage(), 8.8F, FontStyle.Regular, Color.FromArgb(255, 224, 178), 18, 40, 478, 44));
+            card.Controls.Add(CreateFloatingLabel("Detected installed tooling", 10.2F, FontStyle.Bold, Color.FromArgb(146, 64, 14), 18, 10, 460, 24));
+            card.Controls.Add(CreateFloatingLabel(BuildDetectedToolsMessage(), 8.8F, FontStyle.Regular, Color.FromArgb(120, 53, 15), 18, 36, 478, 40));
             return card;
         }
 
@@ -844,7 +916,7 @@ namespace MbsTerminalSetup
             panel.Width = WizardContentWidth;
             panel.Height = 78;
             panel.Margin = new Padding(0, 0, 0, 12);
-            panel.BackColor = Color.FromArgb(21, 30, 47);
+            panel.BackColor = Color.FromArgb(250, 252, 255);
 
             Label label = CreateFloatingLabel(title, 8.8F, FontStyle.Bold, TextColor, 0, 0, 460, 22);
             panel.Controls.Add(label);
@@ -881,11 +953,11 @@ namespace MbsTerminalSetup
         {
             RoundedPanel panel = new RoundedPanel();
             panel.Width = WizardContentWidth;
-            panel.Height = 74;
+            panel.Height = 70;
             panel.Margin = new Padding(0, 0, 0, 10);
-            panel.BackColor = Color.FromArgb(21, 30, 47);
+            panel.BackColor = Color.FromArgb(250, 252, 255);
             panel.FillColor = SurfaceAltColor;
-            panel.BorderColor = Color.FromArgb(54, 68, 91);
+            panel.BorderColor = BorderColor;
             panel.Radius = 8;
             panel.Padding = new Padding(12);
 
@@ -895,25 +967,25 @@ namespace MbsTerminalSetup
             checkbox.CheckedColor = AccentColor;
             checkbox.BorderColor = BorderColor;
             checkbox.SurfaceColor = FieldColor;
-            checkbox.TickColor = Color.FromArgb(8, 25, 17);
-            checkbox.Location = new Point(14, 18);
+            checkbox.TickColor = Color.White;
+            checkbox.Location = new Point(14, 16);
             checkbox.Size = new Size(28, 28);
             checkbox.Text = string.Empty;
             checkbox.UseVisualStyleBackColor = false;
             panel.Controls.Add(checkbox);
 
-            Label titleLabel = CreateFloatingLabel(title, 10.2F, FontStyle.Bold, TextColor, 52, 12, 430, 24);
+            Label titleLabel = CreateFloatingLabel(title, 10.2F, FontStyle.Bold, TextColor, 52, 10, 430, 24);
             panel.Controls.Add(titleLabel);
 
-            Label descriptionLabel = CreateFloatingLabel(description, 8.7F, FontStyle.Regular, MutedTextColor, 52, 38, 432, 24);
+            Label descriptionLabel = CreateFloatingLabel(description, 8.7F, FontStyle.Regular, MutedTextColor, 52, 36, 432, 24);
             panel.Controls.Add(descriptionLabel);
 
             EventHandler updateCard = delegate
             {
                 panel.FillColor = checkbox.Checked ? SelectedSurfaceColor : SurfaceAltColor;
-                panel.BorderColor = checkbox.Checked ? AccentColor : Color.FromArgb(54, 68, 91);
+                panel.BorderColor = checkbox.Checked ? AccentColor : BorderColor;
                 checkbox.BackColor = panel.FillColor;
-                checkbox.SurfaceColor = checkbox.Checked ? Color.FromArgb(16, 72, 48) : FieldColor;
+                checkbox.SurfaceColor = checkbox.Checked ? AccentColor : FieldColor;
                 panel.Invalidate();
                 checkbox.Invalidate();
                 if (reviewSummaryLabel != null)
@@ -939,6 +1011,11 @@ namespace MbsTerminalSetup
             nav.WrapContents = false;
             nav.BackColor = SurfaceColor;
             nav.Padding = new Padding(22, 8, 22, 10);
+
+            installButton = CreatePrimaryButton("Install");
+            installButton.Width = 132;
+            installButton.Click += InstallButtonClick;
+            nav.Controls.Add(installButton);
 
             nextButton = CreatePrimaryButton("Next");
             nextButton.Width = 118;
@@ -1008,10 +1085,10 @@ namespace MbsTerminalSetup
         {
             Button button = CreateButton(text);
             button.BackColor = AccentColor;
-            button.ForeColor = Color.FromArgb(4, 15, 13);
+            button.ForeColor = Color.White;
             button.FlatAppearance.BorderColor = AccentColor;
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(74, 222, 180);
-            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(32, 169, 129);
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(139, 92, 246);
+            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(91, 33, 182);
             return button;
         }
 
@@ -1021,8 +1098,8 @@ namespace MbsTerminalSetup
             button.BackColor = SurfaceAltColor;
             button.ForeColor = TextColor;
             button.FlatAppearance.BorderColor = BorderColor;
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(33, 46, 66);
-            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(24, 35, 51);
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(237, 242, 247);
+            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(226, 232, 240);
             return button;
         }
 
@@ -1032,8 +1109,8 @@ namespace MbsTerminalSetup
             button.BackColor = SurfaceColor;
             button.ForeColor = MutedTextColor;
             button.FlatAppearance.BorderColor = BorderColor;
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(24, 33, 47);
-            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(18, 27, 41);
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(248, 250, 252);
+            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(241, 245, 249);
             return button;
         }
 
@@ -1058,6 +1135,33 @@ namespace MbsTerminalSetup
             {
                 installComposerBox.Checked = true;
             }
+        }
+
+        private void ScopeOptionChanged(object sender, EventArgs e)
+        {
+            if (syncingScopeOptions)
+            {
+                return;
+            }
+
+            syncingScopeOptions = true;
+
+            if (sender == allUsersScopeBox && allUsersScopeBox.Checked)
+            {
+                currentUserScopeBox.Checked = false;
+            }
+            else if (sender == currentUserScopeBox && currentUserScopeBox.Checked)
+            {
+                allUsersScopeBox.Checked = false;
+            }
+
+            if (!currentUserScopeBox.Checked && !allUsersScopeBox.Checked)
+            {
+                currentUserScopeBox.Checked = true;
+            }
+
+            syncingScopeOptions = false;
+            UpdateReviewSummary();
         }
 
         private void BrowseStartingDirectoryClick(object sender, EventArgs e)
@@ -1112,12 +1216,20 @@ namespace MbsTerminalSetup
             {
                 bool isActive = index == currentStep;
                 bool isComplete = index < currentStep;
-                stepLabels[index].BackColor = isActive ? AccentColor : isComplete ? Color.FromArgb(28, 63, 55) : SurfaceAltColor;
-                stepLabels[index].ForeColor = isActive ? Color.FromArgb(4, 15, 13) : TextColor;
+                stepLabels[index].BackColor = isActive ? AccentColor : isComplete ? Color.FromArgb(224, 242, 254) : SurfaceAltColor;
+                stepLabels[index].ForeColor = isActive ? Color.White : TextColor;
             }
 
             bool terminalVisible = currentStep == StepCount - 1 || IsInstalling();
             bool isReviewStep = currentStep == StepCount - 2;
+
+            if (wizardPanel != null && runPanel != null && bodyLayout != null)
+            {
+                wizardPanel.Visible = !terminalVisible;
+                runPanel.Visible = terminalVisible;
+                bodyLayout.ColumnStyles[0].Width = terminalVisible ? 0F : 100F;
+                bodyLayout.ColumnStyles[1].Width = terminalVisible ? 100F : 0F;
+            }
 
             backButton.Enabled = currentStep > 0 && currentStep < StepCount - 1 && !IsInstalling();
             nextButton.Visible = currentStep < StepCount - 2;
@@ -1128,12 +1240,14 @@ namespace MbsTerminalSetup
             trustPanel.Visible = terminalVisible;
             progressBar.Visible = terminalVisible;
             logBox.Visible = terminalVisible;
-            guidePanel.Visible = !terminalVisible;
-            actionPanel.Visible = isReviewStep || terminalVisible;
+            guidePanel.Visible = false;
+            actionPanel.Visible = terminalVisible;
+            runningVisualPanel.Visible = terminalVisible;
+            runningVisualPanel.IsRunning = IsInstalling();
             runTitleLabel.Text = terminalVisible ? "Running Installer" : "Wizard Progress";
             runTextLabel.Text = terminalVisible
-                ? "PowerShell is hidden. Output from install.ps1 appears below."
-                : "Choose options on the left. The command log appears only on the Running step.";
+                ? "PowerShell is hidden. The visual installer stays animated while the script runs."
+                : "Choose options in the wizard. The command log appears only on the Running step.";
 
             if (isReviewStep)
             {
@@ -1145,18 +1259,22 @@ namespace MbsTerminalSetup
                 if (IsInstalling())
                 {
                     statusLabel.Text = "Installing...";
+                    runningVisualPanel.StatusText = "Now installing...";
                 }
                 else if (installHasRun && ExitCode == 0)
                 {
                     statusLabel.Text = "Installed successfully";
+                    runningVisualPanel.StatusText = "Installed successfully";
                 }
                 else if (installHasRun)
                 {
                     statusLabel.Text = "Installation failed";
+                    runningVisualPanel.StatusText = "Installation needs attention";
                 }
                 else
                 {
                     statusLabel.Text = "Ready to run";
+                    runningVisualPanel.StatusText = "Ready to install";
                 }
             }
             else
@@ -1179,6 +1297,7 @@ namespace MbsTerminalSetup
 
             StringBuilder summary = new StringBuilder();
             summary.AppendLine("Terminal profile");
+            summary.AppendLine("  Install scope:      " + GetInstallScopeLabel());
             summary.AppendLine("  Starting directory: " + CleanValue(startingDirectoryBox.Text, "User profile"));
             summary.AppendLine("  Starship install:   " + YesNo(installStarshipBox.Checked));
             summary.AppendLine();
@@ -1207,6 +1326,18 @@ namespace MbsTerminalSetup
         private static string YesNo(bool value)
         {
             return value ? "Yes" : "No";
+        }
+
+        private string GetInstallScopeArgument()
+        {
+            return allUsersScopeBox != null && allUsersScopeBox.Checked ? "AllUsers" : "CurrentUser";
+        }
+
+        private string GetInstallScopeLabel()
+        {
+            return string.Equals(GetInstallScopeArgument(), "AllUsers", StringComparison.Ordinal)
+                ? "All users"
+                : "Current user";
         }
 
         private void InstallButtonClick(object sender, EventArgs e)
@@ -1334,6 +1465,7 @@ namespace MbsTerminalSetup
         {
             AppendLog("Selected setup:", MutedTextColor);
             AppendLog("  Terminal profile: yes", MutedTextColor);
+            AppendLog("  Install scope: " + GetInstallScopeLabel(), MutedTextColor);
             AppendLog("  Starting directory: " + CleanValue(startingDirectoryBox.Text, "User profile"), MutedTextColor);
 
             if (installPhpBox.Checked)
@@ -1397,6 +1529,8 @@ namespace MbsTerminalSetup
             arguments.Add(Quote(installerPath));
             arguments.Add("-StartingDirectory");
             arguments.Add(Quote(startingDirectory));
+            arguments.Add("-InstallScope");
+            arguments.Add(GetInstallScopeArgument());
 
             if (installStarshipBox.Checked)
             {
@@ -1673,6 +1807,119 @@ namespace MbsTerminalSetup
         }
     }
 
+    internal sealed class AnimatedAccentPanel : Panel
+    {
+        public AnimatedAccentPanel()
+        {
+            DoubleBuffered = true;
+            BackColor = Color.White;
+            StatusText = "Now installing...";
+        }
+
+        public float Phase { get; set; }
+        public bool IsRunning { get; set; }
+        public string StatusText { get; set; }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+            Rectangle bounds = new Rectangle(0, 0, Width - 1, Height - 1);
+            using (GraphicsPath cardPath = CreateRoundRectangle(bounds, 8))
+            using (LinearGradientBrush cardBrush = new LinearGradientBrush(bounds, Color.White, Color.FromArgb(250, 245, 255), LinearGradientMode.Horizontal))
+            using (Pen border = new Pen(Color.FromArgb(216, 223, 236), 1F))
+            {
+                e.Graphics.FillPath(cardBrush, cardPath);
+                e.Graphics.DrawPath(border, cardPath);
+            }
+
+            float wave = (float)Math.Sin(Phase) * 18F;
+            PointF[] purpleShape =
+            {
+                new PointF(Width * 0.48F + wave, 0),
+                new PointF(Width, 0),
+                new PointF(Width, Height),
+                new PointF(Width * 0.63F - wave, Height)
+            };
+
+            using (LinearGradientBrush purpleBrush = new LinearGradientBrush(bounds, Color.FromArgb(88, 28, 135), Color.FromArgb(126, 34, 206), LinearGradientMode.Vertical))
+            {
+                e.Graphics.FillPolygon(purpleBrush, purpleShape);
+            }
+
+            using (SolidBrush orange = new SolidBrush(Color.FromArgb(220, 255, 121, 48)))
+            using (SolidBrush pink = new SolidBrush(Color.FromArgb(190, 236, 30, 111)))
+            using (SolidBrush violet = new SolidBrush(Color.FromArgb(165, 91, 33, 182)))
+            {
+                e.Graphics.FillEllipse(orange, Width * 0.43F + wave, Height * 0.25F, 160, 220);
+                e.Graphics.FillEllipse(pink, Width * 0.48F - wave, Height * 0.43F, 210, 170);
+                e.Graphics.FillEllipse(violet, Width * 0.56F + wave * 0.4F, Height * 0.02F, 260, 300);
+            }
+
+            using (Font titleFont = new Font(Font.FontFamily, 20F, FontStyle.Bold))
+            using (Font bodyFont = new Font(Font.FontFamily, 10.5F, FontStyle.Regular))
+            using (SolidBrush titleBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
+            using (SolidBrush bodyBrush = new SolidBrush(Color.FromArgb(71, 85, 105)))
+            {
+                e.Graphics.DrawString("Optimizing your", titleFont, titleBrush, 36, 44);
+                e.Graphics.DrawString("developer setup.", titleFont, titleBrush, 36, 74);
+                e.Graphics.DrawString("MBS Terminal is preparing your selected tools with PowerShell hidden in the background.", bodyFont, bodyBrush, new RectangleF(38, 120, Width * 0.38F, 68));
+            }
+
+            Rectangle track = new Rectangle(Math.Max(Width - 390, 520), Height / 2 - 12, 280, 16);
+            using (GraphicsPath trackPath = CreateRoundRectangle(track, 3))
+            using (SolidBrush trackBrush = new SolidBrush(Color.FromArgb(244, 244, 248)))
+            {
+                e.Graphics.FillPath(trackBrush, trackPath);
+            }
+
+            int segmentWidth;
+            int segmentLeft;
+
+            if (!IsRunning && StatusText.IndexOf("success", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                segmentWidth = track.Width;
+                segmentLeft = track.Left;
+            }
+            else if (!IsRunning && StatusText.IndexOf("attention", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                segmentWidth = track.Width;
+                segmentLeft = track.Left;
+            }
+            else
+            {
+                float progress = Phase - (float)Math.Floor(Phase);
+                segmentWidth = 84;
+                segmentLeft = track.Left + (int)((track.Width - segmentWidth) * progress);
+            }
+
+            Rectangle segment = new Rectangle(segmentLeft, track.Top, segmentWidth, track.Height);
+            using (GraphicsPath segmentPath = CreateRoundRectangle(segment, 3))
+            using (LinearGradientBrush progressBrush = new LinearGradientBrush(segment, Color.FromArgb(14, 165, 233), Color.FromArgb(168, 85, 247), LinearGradientMode.Horizontal))
+            {
+                e.Graphics.FillPath(progressBrush, segmentPath);
+            }
+
+            using (Font statusFont = new Font(Font.FontFamily, 10.5F, FontStyle.Regular))
+            using (SolidBrush statusBrush = new SolidBrush(Color.White))
+            {
+                e.Graphics.DrawString(StatusText, statusFont, statusBrush, track.Left + 30, track.Bottom + 16);
+            }
+        }
+
+        private static GraphicsPath CreateRoundRectangle(Rectangle bounds, int radius)
+        {
+            int diameter = Math.Max(1, radius * 2);
+            GraphicsPath path = new GraphicsPath();
+            path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+    }
+
     internal sealed class HeaderPanel : Panel
     {
         public HeaderPanel()
@@ -1694,12 +1941,17 @@ namespace MbsTerminalSetup
                 e.Graphics.FillRectangle(brush, ClientRectangle);
             }
 
-            using (SolidBrush overlay = new SolidBrush(Color.FromArgb(50, 34, 197, 94)))
+            using (SolidBrush overlay = new SolidBrush(Color.FromArgb(46, 124, 58, 237)))
             {
                 e.Graphics.FillEllipse(overlay, Width - 250, -120, 380, 280);
             }
 
-            using (Pen line = new Pen(Color.FromArgb(70, 255, 255, 255), 1F))
+            using (SolidBrush cyan = new SolidBrush(Color.FromArgb(36, 14, 165, 233)))
+            {
+                e.Graphics.FillEllipse(cyan, Width - 370, 56, 220, 130);
+            }
+
+            using (Pen line = new Pen(Color.FromArgb(220, 213, 221, 234), 1F))
             {
                 e.Graphics.DrawLine(line, 0, Height - 1, Width, Height - 1);
             }

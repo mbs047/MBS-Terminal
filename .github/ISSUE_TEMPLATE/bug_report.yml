@@ -1,0 +1,68 @@
+name: Bug report
+description: Report something that is broken or behaving unexpectedly.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please remove any private paths, tokens, or profile contents before submitting.
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows version
+      description: Example: Windows 11 23H2
+      placeholder: Windows 11 23H2
+    validations:
+      required: true
+  - type: input
+    id: terminal-version
+    attributes:
+      label: Windows Terminal version
+      placeholder: 1.20.0
+  - type: input
+    id: powershell-version
+    attributes:
+      label: PowerShell version
+      placeholder: 5.1.22621.2506
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the smallest set of steps that triggers the problem.
+      placeholder: |
+        1. Run .\install.ps1
+        2. Open Windows Terminal
+        3. See the error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: What happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output or screenshots
+      description: Paste safe command output or attach screenshots. Do not include secrets or private profile contents.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I removed private paths, tokens, or sensitive profile contents.
+          required: true
+        - label: I checked the README and existing issues first.
+          required: true

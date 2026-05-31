@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/mbs047/MBS-Terminal/security/advisories/new
+    about: Report sensitive security issues privately when GitHub private vulnerability reporting is enabled.
+  - name: Questions and setup help
+    url: https://github.com/mbs047/MBS-Terminal/issues/new?template=configuration_help.yml
+    about: Ask for help with installation, Windows Terminal, PowerShell, or Starship setup.

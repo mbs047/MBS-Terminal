@@ -1,0 +1,59 @@
+name: Configuration help
+description: Get help with installation, terminal configuration, or prompt setup.
+title: "[Help]: "
+labels:
+  - support
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share enough context to reproduce the setup issue, but do not paste secrets, tokens, or full profile files.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Installer
+        - Windows Terminal settings
+        - PowerShell profile
+        - Starship prompt
+        - Icons or screenshots
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 23H2
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command you ran
+      placeholder: .\install.ps1 -InstallDependencies
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you need help with?
+      placeholder: Describe the setup issue or question.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output or screenshot
+      description: Paste safe command output or attach screenshots.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I removed private paths, tokens, or sensitive profile contents.
+          required: true
+        - label: I checked the README first.
+          required: true

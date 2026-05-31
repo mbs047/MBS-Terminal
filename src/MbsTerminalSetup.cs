@@ -2160,7 +2160,7 @@ namespace MbsTerminalSetup
             }
 
             currentStep = StepCount - 1;
-            installHasRun = true;
+            installHasRun = false;
             UpdateWizard();
             SetWizardEnabled(false);
             installButton.Enabled = false;
@@ -2169,6 +2169,8 @@ namespace MbsTerminalSetup
             progressBar.Style = ProgressBarStyle.Marquee;
             progressBar.MarqueeAnimationSpeed = 24;
             statusLabel.Text = "Installing...";
+            runningVisualPanel.StatusText = "Installing...";
+            runningVisualPanel.Invalidate();
             AppendLog("Starting installation.", AccentColor);
             AppendSelectedOptions();
             CloseTerminalWindowsBeforeInstall();
@@ -2509,6 +2511,7 @@ namespace MbsTerminalSetup
         private void FinishInstall(int exitCode)
         {
             ExitCode = exitCode;
+            installHasRun = true;
             progressBar.Style = ProgressBarStyle.Blocks;
             progressBar.MarqueeAnimationSpeed = 0;
             progressBar.Value = exitCode == 0 ? 100 : 0;
@@ -2553,6 +2556,36 @@ namespace MbsTerminalSetup
             logBox.AppendText(message + Environment.NewLine);
             logBox.SelectionColor = logBox.ForeColor;
             logBox.ScrollToCaret();
+            UpdateRunningStatusFromLog(message);
+        }
+
+        private void UpdateRunningStatusFromLog(string message)
+        {
+            if (runningVisualPanel == null || !IsInstalling())
+            {
+                return;
+            }
+
+            string statusText = message == null ? string.Empty : message.Trim();
+
+            if (statusText.StartsWith("[MBS-Terminal]", StringComparison.OrdinalIgnoreCase))
+            {
+                statusText = statusText.Substring("[MBS-Terminal]".Length).Trim();
+            }
+
+            if (statusText.Length == 0 || statusText.StartsWith("Warning:", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (statusText.Length > 68)
+            {
+                statusText = statusText.Substring(0, 65).TrimEnd() + "...";
+            }
+
+            statusLabel.Text = statusText;
+            runningVisualPanel.StatusText = statusText;
+            runningVisualPanel.Invalidate();
         }
 
         private void InstallerFormClosing(object sender, FormClosingEventArgs e)
@@ -2783,7 +2816,13 @@ namespace MbsTerminalSetup
             using (Font statusFont = new Font(Font.FontFamily, 10.5F, FontStyle.Regular))
             using (SolidBrush statusBrush = new SolidBrush(Color.White))
             {
-                e.Graphics.DrawString(StatusText, statusFont, statusBrush, track.Left + 30, track.Bottom + 16);
+                RectangleF statusBounds = new RectangleF(track.Left + 30, track.Bottom + 16, track.Width - 20, 26);
+                using (StringFormat statusFormat = new StringFormat())
+                {
+                    statusFormat.Trimming = StringTrimming.EllipsisCharacter;
+                    statusFormat.FormatFlags = StringFormatFlags.NoWrap;
+                    e.Graphics.DrawString(StatusText, statusFont, statusBrush, statusBounds, statusFormat);
+                }
             }
         }
 

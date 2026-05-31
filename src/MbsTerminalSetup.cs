@@ -108,9 +108,13 @@ namespace MbsTerminalSetup
 
     internal sealed class InstallerOptions
     {
+        internal const string DefaultPhpVersion = "8.4";
+        internal static readonly string[] SupportedPhpVersions = { "8.2", "8.3", "8.4", "8.5" };
+
         public string StartingDirectory { get; set; }
         public bool InstallDependencies { get; set; }
         public bool InstallPhp { get; set; }
+        public string PhpVersion { get; set; }
         public string PhpDirectory { get; set; }
         public bool InstallComposer { get; set; }
         public bool InstallLaravel { get; set; }
@@ -198,6 +202,13 @@ namespace MbsTerminalSetup
                     continue;
                 }
 
+                if (IsSwitch(argument, "PhpVersion") && index + 1 < args.Length)
+                {
+                    options.PhpVersion = NormalizePhpVersion(args[index + 1]);
+                    index++;
+                    continue;
+                }
+
                 if (IsSwitch(argument, "InstallScope") && index + 1 < args.Length)
                 {
                     string installScope = args[index + 1];
@@ -220,7 +231,21 @@ namespace MbsTerminalSetup
                 options.InstallScope = "CurrentUser";
             }
 
+            options.PhpVersion = NormalizePhpVersion(options.PhpVersion);
             return options;
+        }
+
+        internal static string NormalizePhpVersion(string value)
+        {
+            for (int index = 0; index < SupportedPhpVersions.Length; index++)
+            {
+                if (string.Equals(value, SupportedPhpVersions[index], StringComparison.OrdinalIgnoreCase))
+                {
+                    return SupportedPhpVersions[index];
+                }
+            }
+
+            return DefaultPhpVersion;
         }
 
         private static bool IsSwitch(string argument, string name)
@@ -258,6 +283,7 @@ namespace MbsTerminalSetup
         private readonly string installerPath;
         private readonly string iconPath;
         private readonly List<Control> wizardPages = new List<Control>();
+        private readonly List<ModernCheckBox> phpVersionBoxes = new List<ModernCheckBox>();
         private readonly Label[] stepLabels = new Label[StepCount];
         private static readonly string[] TerminalProcessNames =
         {
@@ -344,6 +370,7 @@ namespace MbsTerminalSetup
         private int currentStep;
         private bool installHasRun;
         private bool syncingScopeOptions;
+        private bool syncingPhpVersionOptions;
 
         public InstallerForm(InstallerOptions options)
         {
@@ -1063,11 +1090,12 @@ namespace MbsTerminalSetup
             Panel page = CreateWideWizardPage();
             AddPageControl(page, CreateSummaryGrid("Runtime", "Choose how PHP and Composer should be prepared for Laravel tooling."), 22, 22);
             installPhpBox = CreateOptionRow(
-                "Install PHP 8.4",
-                "Uses winget package PHP.PHP.8.4.",
+                "Install PHP with winget",
+                "Installs the selected PHP version from the official winget package.",
                 options.InstallPhp
             );
             AddPageControl(page, installPhpBox.Parent, 22, 126);
+            AddPageControl(page, CreatePhpVersionSelector(options.PhpVersion), 22, 204);
             AddPageControl(page, CreatePathPicker("Existing PHP directory", options.PhpDirectory ?? string.Empty, BrowsePhpDirectoryClick, out phpDirectoryBox), 560, 22);
             AddPageControl(page, CreateNoteCard("Optional: select the folder that contains php.exe if PHP is already installed through Laragon, XAMPP, Herd, or a custom build."), 560, 112);
             installComposerBox = CreateOptionRow(
@@ -1075,7 +1103,7 @@ namespace MbsTerminalSetup
                 "Downloads Composer-Setup.exe and runs it silently with your PHP selection.",
                 options.InstallComposer
             );
-            AddPageControl(page, installComposerBox.Parent, 22, 204);
+            AddPageControl(page, installComposerBox.Parent, 22, 386);
             return page;
         }
 
@@ -1251,6 +1279,90 @@ namespace MbsTerminalSetup
             card.Controls.Add(CreateFloatingLabel("Detected installed tooling", 10.2F, FontStyle.Bold, Color.FromArgb(252, 211, 77), 18, 10, 460, 24));
             card.Controls.Add(CreateFloatingLabel(BuildDetectedToolsMessage(), 8.8F, FontStyle.Regular, Color.FromArgb(253, 230, 138), 18, 36, 478, 40));
             return card;
+        }
+
+        private Control CreatePhpVersionSelector(string selectedVersion)
+        {
+            RoundedPanel card = new RoundedPanel();
+            card.Width = WizardContentWidth;
+            card.Height = 166;
+            card.Margin = new Padding(0, 0, 0, 12);
+            card.FillColor = Color.FromArgb(13, 14, 20);
+            card.BorderColor = BorderColor;
+            card.Radius = 8;
+            card.BackColor = Color.FromArgb(9, 10, 15);
+
+            card.Controls.Add(CreateFloatingLabel("PHP version", 10.2F, FontStyle.Bold, TextColor, 18, 12, 460, 24));
+            card.Controls.Add(CreateFloatingLabel("Used when Install PHP is selected. Package IDs follow PHP.PHP.x.y.", 8.7F, FontStyle.Regular, MutedTextColor, 18, 36, 460, 22));
+
+            phpVersionBoxes.Clear();
+            string normalizedVersion = InstallerOptions.NormalizePhpVersion(selectedVersion);
+            string[] versions = InstallerOptions.SupportedPhpVersions;
+
+            for (int index = 0; index < versions.Length; index++)
+            {
+                int column = index % 2;
+                int row = index / 2;
+                Control tile = CreatePhpVersionTile(
+                    versions[index],
+                    string.Equals(versions[index], normalizedVersion, StringComparison.Ordinal),
+                    18 + (column * 238),
+                    66 + (row * 48)
+                );
+                card.Controls.Add(tile);
+            }
+
+            RefreshPhpVersionStyles();
+            return card;
+        }
+
+        private Control CreatePhpVersionTile(string version, bool isSelected, int left, int top)
+        {
+            RoundedPanel tile = new RoundedPanel();
+            tile.Width = 220;
+            tile.Height = 40;
+            tile.Location = new Point(left, top);
+            tile.FillColor = SurfaceAltColor;
+            tile.BorderColor = BorderColor;
+            tile.Radius = 8;
+            tile.BackColor = Color.FromArgb(13, 14, 20);
+            tile.Cursor = Cursors.Hand;
+
+            ModernCheckBox checkbox = new ModernCheckBox();
+            checkbox.AutoSize = false;
+            checkbox.Checked = isSelected;
+            checkbox.CheckedColor = AccentColor;
+            checkbox.BorderColor = BorderColor;
+            checkbox.SurfaceColor = FieldColor;
+            checkbox.TickColor = Color.White;
+            checkbox.Location = new Point(12, 8);
+            checkbox.Size = new Size(24, 24);
+            checkbox.Tag = version;
+            checkbox.Text = string.Empty;
+            checkbox.UseVisualStyleBackColor = false;
+            checkbox.CheckedChanged += PhpVersionChanged;
+            tile.Controls.Add(checkbox);
+            phpVersionBoxes.Add(checkbox);
+
+            Label versionLabel = CreateFloatingLabel("PHP " + version, 9.4F, FontStyle.Bold, TextColor, 46, 5, 90, 18);
+            Label packageLabel = CreateFloatingLabel("PHP.PHP." + version, 8.1F, FontStyle.Regular, MutedTextColor, 46, 22, 120, 16);
+            tile.Controls.Add(versionLabel);
+            tile.Controls.Add(packageLabel);
+
+            EventHandler chooseVersion = delegate
+            {
+                checkbox.Checked = true;
+                if (installPhpBox != null && !installPhpBox.Checked)
+                {
+                    installPhpBox.Checked = true;
+                }
+            };
+
+            tile.Click += chooseVersion;
+            versionLabel.Click += chooseVersion;
+            packageLabel.Click += chooseVersion;
+
+            return tile;
         }
 
         private static string BuildDetectedToolsMessage()
@@ -1670,6 +1782,84 @@ namespace MbsTerminalSetup
             }
         }
 
+        private void PhpVersionChanged(object sender, EventArgs e)
+        {
+            if (syncingPhpVersionOptions)
+            {
+                return;
+            }
+
+            ModernCheckBox selectedBox = sender as ModernCheckBox;
+
+            if (selectedBox == null)
+            {
+                return;
+            }
+
+            if (!selectedBox.Checked && !HasSelectedPhpVersion())
+            {
+                syncingPhpVersionOptions = true;
+                selectedBox.Checked = true;
+                syncingPhpVersionOptions = false;
+            }
+
+            if (selectedBox.Checked)
+            {
+                syncingPhpVersionOptions = true;
+
+                foreach (ModernCheckBox versionBox in phpVersionBoxes)
+                {
+                    if (!ReferenceEquals(versionBox, selectedBox))
+                    {
+                        versionBox.Checked = false;
+                    }
+                }
+
+                syncingPhpVersionOptions = false;
+
+                if (installPhpBox != null && !installPhpBox.Checked)
+                {
+                    installPhpBox.Checked = true;
+                }
+            }
+
+            RefreshPhpVersionStyles();
+            UpdateReviewSummary();
+        }
+
+        private bool HasSelectedPhpVersion()
+        {
+            foreach (ModernCheckBox versionBox in phpVersionBoxes)
+            {
+                if (versionBox.Checked)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void RefreshPhpVersionStyles()
+        {
+            foreach (ModernCheckBox versionBox in phpVersionBoxes)
+            {
+                RoundedPanel tile = versionBox.Parent as RoundedPanel;
+
+                if (tile == null)
+                {
+                    continue;
+                }
+
+                tile.FillColor = versionBox.Checked ? SelectedSurfaceColor : SurfaceAltColor;
+                tile.BorderColor = versionBox.Checked ? AccentColor : BorderColor;
+                versionBox.BackColor = tile.FillColor;
+                versionBox.SurfaceColor = versionBox.Checked ? AccentColor : FieldColor;
+                versionBox.Invalidate();
+                tile.Invalidate();
+            }
+        }
+
         private static bool IsChecked(CheckBox checkBox)
         {
             return checkBox != null && checkBox.Checked;
@@ -1853,7 +2043,8 @@ namespace MbsTerminalSetup
             summary.AppendLine("  Starship install:   " + YesNo(installStarshipBox.Checked));
             summary.AppendLine();
             summary.AppendLine("Runtime");
-            summary.AppendLine("  Install PHP 8.4:    " + YesNo(installPhpBox.Checked));
+            summary.AppendLine("  Install PHP:        " + YesNo(installPhpBox.Checked));
+            summary.AppendLine("  PHP version:        " + GetSelectedPhpVersion());
             summary.AppendLine("  Existing PHP path:  " + CleanValue(phpDirectoryBox.Text, "Not selected"));
             summary.AppendLine("  Composer:           " + YesNo(installComposerBox.Checked));
             summary.AppendLine();
@@ -1865,6 +2056,19 @@ namespace MbsTerminalSetup
             summary.AppendLine("  Laravel Envoy:      " + YesNo(installEnvoyBox.Checked));
             summary.AppendLine("  Vapor CLI:          " + YesNo(installVaporBox.Checked));
             reviewSummaryLabel.Text = summary.ToString();
+        }
+
+        private string GetSelectedPhpVersion()
+        {
+            foreach (ModernCheckBox versionBox in phpVersionBoxes)
+            {
+                if (versionBox.Checked && versionBox.Tag != null)
+                {
+                    return InstallerOptions.NormalizePhpVersion(versionBox.Tag.ToString());
+                }
+            }
+
+            return InstallerOptions.DefaultPhpVersion;
         }
 
         private static string CleanValue(string value, string fallback)
@@ -2112,7 +2316,7 @@ namespace MbsTerminalSetup
 
             if (installPhpBox.Checked)
             {
-                AppendLog("  PHP 8.4: install with winget", MutedTextColor);
+                AppendLog("  PHP " + GetSelectedPhpVersion() + ": install with winget", MutedTextColor);
             }
 
             if (!string.IsNullOrWhiteSpace(phpDirectoryBox.Text))
@@ -2199,6 +2403,8 @@ namespace MbsTerminalSetup
             if (installPhpBox.Checked)
             {
                 arguments.Add("-InstallPhp");
+                arguments.Add("-PhpVersion");
+                arguments.Add(Quote(GetSelectedPhpVersion()));
             }
 
             string phpDirectory = phpDirectoryBox.Text.Trim();

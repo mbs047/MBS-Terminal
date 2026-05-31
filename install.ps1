@@ -2,6 +2,8 @@ param(
     [string] $StartingDirectory = '',
     [switch] $InstallDependencies,
     [switch] $InstallPhp,
+    [ValidateSet('8.2', '8.3', '8.4', '8.5')]
+    [string] $PhpVersion = '8.4',
     [string] $PhpDirectory = '',
     [switch] $InstallComposer,
     [switch] $InstallLaravel,
@@ -154,6 +156,10 @@ function Get-WingetScopeArguments {
     return @()
 }
 
+function Get-PhpWingetPackageId {
+    return "PHP.PHP.$PhpVersion"
+}
+
 function Get-PhpExecutable {
     if (-not [string]::IsNullOrWhiteSpace($PhpDirectory)) {
         $expandedPath = [Environment]::ExpandEnvironmentVariables($PhpDirectory)
@@ -219,28 +225,29 @@ function Install-PhpIfRequested {
         return
     }
 
+    $phpPackageId = Get-PhpWingetPackageId
+
     if (Get-Command php -ErrorAction SilentlyContinue) {
+        Write-Step "PHP is already available. Ensuring PHP $PhpVersion is installed."
+
         if ($UpdateTools -and (Get-Command winget -ErrorAction SilentlyContinue)) {
             try {
                 $wingetArguments = @(
                     'upgrade',
                     '--id',
-                    'PHP.PHP.8.4',
+                    $phpPackageId,
                     '--exact',
                     '--source',
                     'winget',
                     '--accept-package-agreements',
                     '--accept-source-agreements'
                 ) + (Get-WingetScopeArguments)
-                Invoke-ExternalCommand -FilePath 'winget' -Arguments $wingetArguments -Description 'Updating PHP 8.4 through winget.'
+                Invoke-ExternalCommand -FilePath 'winget' -Arguments $wingetArguments -Description "Updating PHP $PhpVersion through winget."
                 Refresh-ProcessPath
             } catch {
                 Write-SoftWarning "Could not update PHP automatically. $($_.Exception.Message)"
             }
-        } else {
-            Write-Step 'PHP is already available.'
         }
-        return
     }
 
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
@@ -252,14 +259,14 @@ function Install-PhpIfRequested {
         $wingetArguments = @(
             'install',
             '--id',
-            'PHP.PHP.8.4',
+            $phpPackageId,
             '--exact',
             '--source',
             'winget',
             '--accept-package-agreements',
             '--accept-source-agreements'
         ) + (Get-WingetScopeArguments)
-        Invoke-ExternalCommand -FilePath 'winget' -Arguments $wingetArguments -Description 'Installing PHP 8.4 through winget.'
+        Invoke-ExternalCommand -FilePath 'winget' -Arguments $wingetArguments -Description "Installing PHP $PhpVersion through winget."
         Refresh-ProcessPath
     } catch {
         Write-SoftWarning "Could not install PHP automatically. $($_.Exception.Message)"

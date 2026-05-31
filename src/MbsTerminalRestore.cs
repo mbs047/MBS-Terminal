@@ -35,6 +35,7 @@ namespace MbsTerminalRestore
 
         private readonly string repositoryRoot;
         private readonly string restoreScriptPath;
+        private readonly string iconPath;
         private readonly CheckBox keepStarshipBox;
         private readonly Button restoreButton;
         private readonly Button cancelButton;
@@ -49,6 +50,7 @@ namespace MbsTerminalRestore
         {
             repositoryRoot = GetRepositoryRoot();
             restoreScriptPath = Path.Combine(repositoryRoot, "restore-default.ps1");
+            iconPath = Path.Combine(repositoryRoot, @"assets\terminal-icons\mbs-terminal.ico");
 
             ExitCode = 0;
             Text = "MBS Terminal Restore";
@@ -58,6 +60,7 @@ namespace MbsTerminalRestore
             BackColor = BackgroundColor;
             ForeColor = TextColor;
             Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            Icon = LoadWindowIcon();
 
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.Dock = DockStyle.Fill;
@@ -208,6 +211,22 @@ namespace MbsTerminalRestore
             label.Dock = DockStyle.Fill;
             label.TextAlign = ContentAlignment.MiddleLeft;
             return label;
+        }
+
+        private Icon LoadWindowIcon()
+        {
+            try
+            {
+                if (File.Exists(iconPath))
+                {
+                    return new Icon(iconPath);
+                }
+            }
+            catch
+            {
+            }
+
+            return Icon;
         }
 
         private static Button CreatePrimaryButton(string text)

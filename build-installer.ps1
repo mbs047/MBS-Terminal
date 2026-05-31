@@ -59,4 +59,5 @@ Build-WindowsExecutable `
 
 Build-WindowsExecutable `
     -Source (Join-Path $repositoryRoot 'src\MbsTerminalRestore.cs') `
-    -Output (Join-Path $repositoryRoot 'MBS-Terminal-Restore.exe')
+    -Output (Join-Path $repositoryRoot 'MBS-Terminal-Restore.exe') `
+    -Icon (Join-Path $repositoryRoot 'assets\terminal-icons\mbs-terminal.ico')

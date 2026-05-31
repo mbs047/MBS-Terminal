@@ -4,6 +4,14 @@ $script:LaravelArtisanCommandCache = @{}
 $script:ComposerScriptsCache = @{}
 $script:NpmScriptsCache = @{}
 
+try {
+    $script:MbsUtf8Encoding = [System.Text.UTF8Encoding]::new($false)
+    [Console]::InputEncoding = $script:MbsUtf8Encoding
+    [Console]::OutputEncoding = $script:MbsUtf8Encoding
+    $global:OutputEncoding = $script:MbsUtf8Encoding
+} catch {
+}
+
 if (Get-Module -ListAvailable -Name PSReadLine) {
     Import-Module PSReadLine -ErrorAction SilentlyContinue
 

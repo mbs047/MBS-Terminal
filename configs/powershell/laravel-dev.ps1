@@ -538,21 +538,74 @@ function Get-MbsItemColor {
         [System.IO.FileSystemInfo] $Item
     )
 
+    if ($Item.Name.StartsWith('.') -and -not $Item.PSIsContainer) {
+        return 'DarkGray'
+    }
+
+    if ($Item.Name.StartsWith('.') -and $Item.PSIsContainer) {
+        return 'DarkCyan'
+    }
+
     if ($Item.PSIsContainer) {
         return 'Cyan'
     }
 
-    switch ($Item.Extension.ToLowerInvariant()) {
+    $name = $Item.Name.ToLowerInvariant()
+    $extension = $Item.Extension.ToLowerInvariant()
+
+    if ($name -match '(^|\.)(env|env\.local|env\.example)$') {
+        return 'DarkYellow'
+    }
+
+    if ($name.EndsWith('.blade.php')) {
+        return 'Magenta'
+    }
+
+    switch ($extension) {
         '.php' { return 'Magenta' }
-        '.blade.php' { return 'Magenta' }
+        '.phtml' { return 'Magenta' }
         '.js' { return 'Yellow' }
+        '.jsx' { return 'Yellow' }
         '.ts' { return 'Yellow' }
+        '.tsx' { return 'Yellow' }
+        '.mjs' { return 'Yellow' }
+        '.cjs' { return 'Yellow' }
+        '.ps1' { return 'Yellow' }
+        '.psm1' { return 'Yellow' }
+        '.psd1' { return 'Yellow' }
+        '.bat' { return 'Green' }
+        '.cmd' { return 'Green' }
+        '.exe' { return 'Green' }
+        '.msi' { return 'Green' }
         '.json' { return 'Green' }
-        '.env' { return 'DarkYellow' }
+        '.jsonc' { return 'Green' }
+        '.toml' { return 'Green' }
+        '.yml' { return 'Green' }
+        '.yaml' { return 'Green' }
+        '.xml' { return 'Green' }
+        '.config' { return 'Green' }
         '.css' { return 'Blue' }
         '.scss' { return 'Blue' }
+        '.sass' { return 'Blue' }
+        '.less' { return 'Blue' }
         '.md' { return 'White' }
+        '.markdown' { return 'White' }
+        '.txt' { return 'White' }
+        '.rst' { return 'White' }
+        '.png' { return 'DarkMagenta' }
+        '.jpg' { return 'DarkMagenta' }
+        '.jpeg' { return 'DarkMagenta' }
+        '.gif' { return 'DarkMagenta' }
+        '.svg' { return 'DarkMagenta' }
+        '.ico' { return 'DarkMagenta' }
+        '.webp' { return 'DarkMagenta' }
+        '.zip' { return 'DarkYellow' }
+        '.7z' { return 'DarkYellow' }
+        '.rar' { return 'DarkYellow' }
+        '.tar' { return 'DarkYellow' }
+        '.gz' { return 'DarkYellow' }
         '.lock' { return 'DarkGray' }
+        '.log' { return 'DarkGray' }
         default { return 'Gray' }
     }
 }
@@ -604,7 +657,9 @@ function Show-MbsDirectoryList {
             $modified = $item.LastWriteTime.ToString('MMM dd yyyy HH:mm')
             $color = Get-MbsItemColor -Item $item
 
-            Write-Host ('| {0,-8} | {1,10} | {2,-16} | ' -f $kind, $size, $modified) -NoNewline -ForegroundColor DarkGray
+            Write-Host '| ' -NoNewline -ForegroundColor DarkGray
+            Write-Host ('{0,-8}' -f $kind) -NoNewline -ForegroundColor $color
+            Write-Host (' | {0,10} | {1,-16} | ' -f $size, $modified) -NoNewline -ForegroundColor DarkGray
             Write-Host $item.Name -ForegroundColor $color
         }
 

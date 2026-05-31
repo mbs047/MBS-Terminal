@@ -115,6 +115,9 @@ namespace MbsTerminalSetup
         public bool InstallComposer { get; set; }
         public bool InstallLaravel { get; set; }
         public bool InstallValet { get; set; }
+        public bool InstallPint { get; set; }
+        public bool InstallEnvoy { get; set; }
+        public bool InstallVapor { get; set; }
         public bool UpdateTools { get; set; }
         public string InstallScope { get; set; }
         public string DisplayName { get; set; }
@@ -154,6 +157,24 @@ namespace MbsTerminalSetup
                 if (IsSwitch(argument, "InstallValet"))
                 {
                     options.InstallValet = true;
+                    continue;
+                }
+
+                if (IsSwitch(argument, "InstallPint"))
+                {
+                    options.InstallPint = true;
+                    continue;
+                }
+
+                if (IsSwitch(argument, "InstallEnvoy"))
+                {
+                    options.InstallEnvoy = true;
+                    continue;
+                }
+
+                if (IsSwitch(argument, "InstallVapor"))
+                {
+                    options.InstallVapor = true;
                     continue;
                 }
 
@@ -299,6 +320,9 @@ namespace MbsTerminalSetup
         private ModernCheckBox installComposerBox;
         private ModernCheckBox installLaravelBox;
         private ModernCheckBox installValetBox;
+        private ModernCheckBox installPintBox;
+        private ModernCheckBox installEnvoyBox;
+        private ModernCheckBox installVaporBox;
         private ModernCheckBox updateToolsBox;
         private Label runTitleLabel;
         private Label runTextLabel;
@@ -477,6 +501,9 @@ namespace MbsTerminalSetup
 
             installLaravelBox.CheckedChanged += ToolingOptionChanged;
             installValetBox.CheckedChanged += ToolingOptionChanged;
+            installPintBox.CheckedChanged += ToolingOptionChanged;
+            installEnvoyBox.CheckedChanged += ToolingOptionChanged;
+            installVaporBox.CheckedChanged += ToolingOptionChanged;
 
             FormClosing += InstallerFormClosing;
 
@@ -1055,27 +1082,52 @@ namespace MbsTerminalSetup
         private Control CreateLaravelPage(InstallerOptions options)
         {
             Panel page = CreateWideWizardPage();
-            AddPageControl(page, CreateSummaryGrid("Tooling", "Install global developer tools after Composer is ready."), 22, 22);
+            AddPageControl(page, CreateSummaryGrid("Tooling", "Choose Laravel and local-dev tools after Composer is ready."), 22, 22);
             AddPageControl(page, CreateDetectedToolsCard(), 22, 126);
             updateToolsBox = CreateOptionRow(
                 "Update tooling that is already installed",
-                "Refreshes PHP with winget and Composer with self-update when selected.",
+                "Refreshes PHP with winget and Composer with self-update before installing selected packages.",
                 options.UpdateTools
             );
             AddPageControl(page, updateToolsBox.Parent, 22, 220);
+            AddPageControl(page, CreateNoteCard("Installed tools are detected from PATH. Use update when you want the selected tools refreshed instead of only added."), 22, 306);
+
             installLaravelBox = CreateOptionRow(
                 "Install Laravel Installer",
-                "Runs composer global require laravel/installer.",
+                "Adds the laravel command for creating and managing Laravel applications.",
                 options.InstallLaravel
             );
             AddPageControl(page, installLaravelBox.Parent, 560, 22);
+
             installValetBox = CreateOptionRow(
                 "Install Valet for Windows",
-                "Runs composer global require ycodetech/valet-windows, then valet install.",
+                "Installs ycodetech/valet-windows and runs valet install for local sites.",
                 options.InstallValet
             );
             AddPageControl(page, installValetBox.Parent, 560, 100);
-            AddPageControl(page, CreateNoteCard("Composer will be selected automatically when Laravel Installer or Valet is enabled."), 560, 190);
+
+            installPintBox = CreateOptionRow(
+                "Install Laravel Pint",
+                "Adds the pint formatter globally for Laravel code style checks.",
+                options.InstallPint
+            );
+            AddPageControl(page, installPintBox.Parent, 560, 178);
+
+            installEnvoyBox = CreateOptionRow(
+                "Install Laravel Envoy",
+                "Adds Envoy for running deployment and server automation tasks.",
+                options.InstallEnvoy
+            );
+            AddPageControl(page, installEnvoyBox.Parent, 560, 256);
+
+            installVaporBox = CreateOptionRow(
+                "Install Laravel Vapor CLI",
+                "Adds the vapor command for managing Laravel Vapor projects.",
+                options.InstallVapor
+            );
+            AddPageControl(page, installVaporBox.Parent, 560, 334);
+
+            AddPageControl(page, CreateNoteCard("Composer will be selected automatically when any Laravel tool is enabled."), 22, 392);
             return page;
         }
 
@@ -1209,6 +1261,9 @@ namespace MbsTerminalSetup
             AddDetectedTool(installed, "composer", "Composer");
             AddDetectedTool(installed, "laravel", "Laravel Installer");
             AddDetectedTool(installed, "valet", "Valet");
+            AddDetectedTool(installed, "pint", "Pint");
+            AddDetectedTool(installed, "envoy", "Envoy");
+            AddDetectedTool(installed, "vapor", "Vapor");
             AddDetectedTool(installed, "starship", "Starship");
 
             if (installed.Count == 0)
@@ -1602,10 +1657,22 @@ namespace MbsTerminalSetup
 
         private void ToolingOptionChanged(object sender, EventArgs e)
         {
-            if ((installLaravelBox.Checked || installValetBox.Checked) && !installComposerBox.Checked)
+            bool needsComposer =
+                IsChecked(installLaravelBox) ||
+                IsChecked(installValetBox) ||
+                IsChecked(installPintBox) ||
+                IsChecked(installEnvoyBox) ||
+                IsChecked(installVaporBox);
+
+            if (needsComposer && installComposerBox != null && !installComposerBox.Checked)
             {
                 installComposerBox.Checked = true;
             }
+        }
+
+        private static bool IsChecked(CheckBox checkBox)
+        {
+            return checkBox != null && checkBox.Checked;
         }
 
         private void ScopeOptionChanged(object sender, EventArgs e)
@@ -1794,6 +1861,9 @@ namespace MbsTerminalSetup
             summary.AppendLine("  Update installed:   " + YesNo(updateToolsBox.Checked));
             summary.AppendLine("  Laravel Installer:  " + YesNo(installLaravelBox.Checked));
             summary.AppendLine("  Valet for Windows:  " + YesNo(installValetBox.Checked));
+            summary.AppendLine("  Laravel Pint:       " + YesNo(installPintBox.Checked));
+            summary.AppendLine("  Laravel Envoy:      " + YesNo(installEnvoyBox.Checked));
+            summary.AppendLine("  Vapor CLI:          " + YesNo(installVaporBox.Checked));
             reviewSummaryLabel.Text = summary.ToString();
         }
 
@@ -2070,6 +2140,21 @@ namespace MbsTerminalSetup
                 AppendLog("  Valet for Windows: install globally", MutedTextColor);
             }
 
+            if (installPintBox.Checked)
+            {
+                AppendLog("  Laravel Pint: install globally", MutedTextColor);
+            }
+
+            if (installEnvoyBox.Checked)
+            {
+                AppendLog("  Laravel Envoy: install globally", MutedTextColor);
+            }
+
+            if (installVaporBox.Checked)
+            {
+                AppendLog("  Laravel Vapor CLI: install globally", MutedTextColor);
+            }
+
             if (installStarshipBox.Checked)
             {
                 AppendLog("  Starship: install if missing", MutedTextColor);
@@ -2142,6 +2227,21 @@ namespace MbsTerminalSetup
             if (installValetBox.Checked)
             {
                 arguments.Add("-InstallValet");
+            }
+
+            if (installPintBox.Checked)
+            {
+                arguments.Add("-InstallPint");
+            }
+
+            if (installEnvoyBox.Checked)
+            {
+                arguments.Add("-InstallEnvoy");
+            }
+
+            if (installVaporBox.Checked)
+            {
+                arguments.Add("-InstallVapor");
             }
 
             return string.Join(" ", arguments.ToArray());

@@ -6,6 +6,9 @@ param(
     [switch] $InstallComposer,
     [switch] $InstallLaravel,
     [switch] $InstallValet,
+    [switch] $InstallPint,
+    [switch] $InstallEnvoy,
+    [switch] $InstallVapor,
     [switch] $UpdateTools,
     [ValidateSet('CurrentUser', 'AllUsers')]
     [string] $InstallScope = 'CurrentUser',
@@ -397,6 +400,30 @@ function Install-ValetIfRequested {
     }
 }
 
+function Install-PintIfRequested {
+    if (-not $InstallPint) {
+        return
+    }
+
+    [void](Install-ComposerGlobalPackage -PackageName 'laravel/pint' -Label 'Laravel Pint')
+}
+
+function Install-EnvoyIfRequested {
+    if (-not $InstallEnvoy) {
+        return
+    }
+
+    [void](Install-ComposerGlobalPackage -PackageName 'laravel/envoy' -Label 'Laravel Envoy')
+}
+
+function Install-VaporIfRequested {
+    if (-not $InstallVapor) {
+        return
+    }
+
+    [void](Install-ComposerGlobalPackage -PackageName 'laravel/vapor-cli' -Label 'Laravel Vapor CLI')
+}
+
 function Install-PSReadLineIfPossible {
     if (-not (Get-Command Install-Module -ErrorAction SilentlyContinue)) {
         Write-SoftWarning 'Install-Module is not available, skipping PSReadLine update.'
@@ -616,6 +643,9 @@ Install-PhpIfRequested
 Install-ComposerIfRequested
 Install-LaravelIfRequested
 Install-ValetIfRequested
+Install-PintIfRequested
+Install-EnvoyIfRequested
+Install-VaporIfRequested
 Install-PSReadLineIfPossible
 
 Write-Step 'Done. Open a new Windows Terminal tab to see the setup.'

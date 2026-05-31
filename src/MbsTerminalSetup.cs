@@ -1129,7 +1129,7 @@ namespace MbsTerminalSetup
 
             installValetBox = CreateOptionRow(
                 "Install Valet for Windows",
-                "Installs ycodetech/valet-windows and runs valet install for local sites.",
+                "Installs the maintained Windows fork and runs valet install for local sites.",
                 options.InstallValet
             );
             AddPageControl(page, installValetBox.Parent, 560, 100);

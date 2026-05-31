@@ -363,7 +363,9 @@ function Install-ComposerGlobalPackage {
         Invoke-ExternalCommand -FilePath $composer.Source -Arguments @(
             'global',
             'require',
-            $PackageName
+            $PackageName,
+            '--with-all-dependencies',
+            '--no-interaction'
         ) -Description "Installing $Label with Composer."
         Add-PathEntry -Directory (Get-ComposerGlobalBin)
         Refresh-ProcessPath
@@ -371,6 +373,39 @@ function Install-ComposerGlobalPackage {
     } catch {
         Write-SoftWarning "Could not install $Label. $($_.Exception.Message)"
         return $false
+    }
+}
+
+function Remove-ComposerGlobalPackageIfInstalled {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $PackageName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Label
+    )
+
+    $composer = Get-Command composer -ErrorAction SilentlyContinue
+
+    if (-not $composer) {
+        return
+    }
+
+    & $composer.Source global show $PackageName --no-interaction *> $null
+
+    if ($LASTEXITCODE -ne 0) {
+        return
+    }
+
+    try {
+        Invoke-ExternalCommand -FilePath $composer.Source -Arguments @(
+            'global',
+            'remove',
+            $PackageName,
+            '--no-interaction'
+        ) -Description "Removing conflicting Composer package $Label."
+    } catch {
+        Write-SoftWarning "Could not remove conflicting Composer package $Label. $($_.Exception.Message)"
     }
 }
 
@@ -386,6 +421,9 @@ function Install-ValetIfRequested {
     if (-not $InstallValet) {
         return
     }
+
+    Write-Step 'Valet for Windows uses ycodetech/valet-windows because the original cretueusebiu package is blocked by Composer security policy.'
+    Remove-ComposerGlobalPackageIfInstalled -PackageName 'cretueusebiu/valet-windows' -Label 'legacy Valet for Windows'
 
     $installed = Install-ComposerGlobalPackage -PackageName 'ycodetech/valet-windows' -Label 'Valet for Windows'
 
@@ -575,7 +613,7 @@ function Install-WindowsTerminalSettings {
     Copy-Item -LiteralPath $settingsPath -Destination $backupPath -Force
 
     $settings = Get-Content -LiteralPath $TemplatePath -Raw | ConvertFrom-Json
-    $devIcon = (Join-Path $IconsDirectory 'mbs-pixel-avatar.png').Replace('\', '/')
+    $devIcon = (Join-Path $IconsDirectory 'mbs-dev-shell.png').Replace('\', '/')
     $cmdIcon = (Join-Path $IconsDirectory 'mbs-cmd.png').Replace('\', '/')
     $cloudIcon = (Join-Path $IconsDirectory 'mbs-cloud.png').Replace('\', '/')
 

@@ -204,6 +204,7 @@ namespace MbsTerminalSetup
     internal sealed class InstallerForm : Form
     {
         private const int WizardContentWidth = 520;
+        private const int WideContentWidth = 1058;
         private const int StepCount = 6;
 
         private static readonly Color BackgroundColor = Color.FromArgb(4, 4, 7);
@@ -793,23 +794,23 @@ namespace MbsTerminalSetup
         private Control CreateTermsPage()
         {
             Panel page = CreateWideWizardPage();
-            AddPageControl(page, CreateSummaryGrid("Terms", "This setup can change terminal settings, PowerShell profile files, PATH entries, and developer tooling."), 22, 22);
+            Control summaryCard = CreateSummaryGrid("Terms", "This setup can change terminal settings, PowerShell profile files, PATH entries, and developer tooling.");
+            StretchCard(summaryCard, WideContentWidth);
+            AddPageControl(page, summaryCard, 22, 22);
 
             RoundedPanel termsCard = new RoundedPanel();
-            termsCard.Width = WizardContentWidth;
+            termsCard.Width = WideContentWidth;
             termsCard.Height = 226;
             termsCard.FillColor = Color.FromArgb(13, 14, 20);
             termsCard.BorderColor = BorderColor;
             termsCard.Radius = 8;
             termsCard.BackColor = Color.FromArgb(9, 10, 15);
 
-            termsCard.Controls.Add(CreateFloatingLabel("Before you continue", 13F, FontStyle.Bold, TextColor, 18, 16, 460, 28));
-            termsCard.Controls.Add(CreateFloatingLabel("MBS Terminal Setup may copy or update Windows Terminal profile assets, PowerShell profile helper files, environment PATH entries, and optional developer tools selected in this wizard.", 9F, FontStyle.Regular, MutedTextColor, 18, 52, 478, 58));
-            termsCard.Controls.Add(CreateFloatingLabel("Some options use winget, Composer, or downloaded installers. Review each step before installing, and use All users only when you understand it may require administrator rights.", 9F, FontStyle.Regular, MutedTextColor, 18, 116, 478, 58));
-            termsCard.Controls.Add(CreateFloatingLabel("Nothing installs until the Review step and Install button.", 9.4F, FontStyle.Bold, Color.FromArgb(186, 230, 253), 18, 180, 478, 26));
+            termsCard.Controls.Add(CreateFloatingLabel("Before you continue", 13F, FontStyle.Bold, TextColor, 18, 16, 1000, 28));
+            termsCard.Controls.Add(CreateFloatingLabel("MBS Terminal Setup may copy or update Windows Terminal profile assets, PowerShell profile helper files, environment PATH entries, and optional developer tools selected in this wizard.", 9F, FontStyle.Regular, MutedTextColor, 18, 52, 1008, 44));
+            termsCard.Controls.Add(CreateFloatingLabel("Some options use winget, Composer, or downloaded installers. Review each step before installing, and use All users only when you understand it may require administrator rights.", 9F, FontStyle.Regular, MutedTextColor, 18, 108, 1008, 44));
+            termsCard.Controls.Add(CreateFloatingLabel("Nothing installs until the Review step and Install button.", 9.4F, FontStyle.Bold, Color.FromArgb(186, 230, 253), 18, 170, 1008, 26));
             AddPageControl(page, termsCard, 22, 126);
-
-            AddPageControl(page, CreateNoteCard("The command output stays hidden until the final Running step. PowerShell itself opens without a visible terminal window."), 560, 22);
 
             termsAcceptedBox = CreateOptionRow(
                 "I accept these terms",
@@ -817,9 +818,12 @@ namespace MbsTerminalSetup
                 false
             );
             termsAcceptedBox.CheckedChanged += delegate { UpdateWizard(); };
-            AddPageControl(page, termsAcceptedBox.Parent, 560, 112);
+            StretchCard(termsAcceptedBox.Parent, WideContentWidth);
+            AddPageControl(page, termsAcceptedBox.Parent, 22, 364);
 
-            AddPageControl(page, CreateNoteCard("You can close this installer now if you do not want these changes prepared on this machine."), 560, 194);
+            Control closeNote = CreateNoteCard("You can close this installer now if you do not want these changes prepared on this machine.");
+            StretchCard(closeNote, WideContentWidth);
+            AddPageControl(page, closeNote, 22, 446);
             return page;
         }
 
@@ -958,6 +962,19 @@ namespace MbsTerminalSetup
             control.Location = new Point(left, top);
             control.Margin = new Padding(0);
             page.Controls.Add(control);
+        }
+
+        private static void StretchCard(Control control, int width)
+        {
+            control.Width = width;
+
+            foreach (Control child in control.Controls)
+            {
+                if (child is Label && child.Left > 0)
+                {
+                    child.Width = Math.Max(40, width - child.Left - 24);
+                }
+            }
         }
 
         private static Control CreateSummaryGrid(string title, string body)

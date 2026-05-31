@@ -6,7 +6,9 @@ param(
     [switch] $InstallComposer,
     [switch] $InstallLaravel,
     [switch] $InstallValet,
-    [switch] $UpdateTools
+    [switch] $UpdateTools,
+    [ValidateSet('CurrentUser', 'AllUsers')]
+    [string] $InstallScope = 'CurrentUser'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,7 +51,21 @@ function Copy-FileEnsuringDirectory {
     Copy-Item -LiteralPath $Source -Destination $Destination -Force
 }
 
-function Add-UserPathEntry {
+function Test-IsAdministrator {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Get-EnvironmentTarget {
+    if ($InstallScope -eq 'AllUsers') {
+        return 'Machine'
+    }
+
+    return 'User'
+}
+
+function Add-PathEntry {
     param([string] $Directory)
 
     if ([string]::IsNullOrWhiteSpace($Directory)) {
@@ -63,19 +79,26 @@ function Add-UserPathEntry {
         return
     }
 
-    $currentUserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $target = Get-EnvironmentTarget
+
+    if ($target -eq 'Machine' -and -not (Test-IsAdministrator)) {
+        Write-SoftWarning "Administrator rights are required to add machine PATH entries. Falling back to user PATH for: $resolvedDirectory"
+        $target = 'User'
+    }
+
+    $currentPath = [Environment]::GetEnvironmentVariable('Path', $target)
     $entries = @()
 
-    if (-not [string]::IsNullOrWhiteSpace($currentUserPath)) {
-        $entries = $currentUserPath -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    if (-not [string]::IsNullOrWhiteSpace($currentPath)) {
+        $entries = $currentPath -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     }
 
     $hasEntry = $entries | Where-Object { $_.TrimEnd('\') -ieq $resolvedDirectory.TrimEnd('\') } | Select-Object -First 1
 
     if (-not $hasEntry) {
         $entries += $resolvedDirectory
-        [Environment]::SetEnvironmentVariable('Path', ($entries -join ';'), 'User')
-        Write-Step "Added to user PATH: $resolvedDirectory"
+        [Environment]::SetEnvironmentVariable('Path', ($entries -join ';'), $target)
+        Write-Step "Added to $target PATH: $resolvedDirectory"
     }
 
     $processEntries = $env:Path -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
@@ -90,6 +113,14 @@ function Refresh-ProcessPath {
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
     $env:Path = @($machinePath, $userPath) -join ';'
+}
+
+function Get-WingetScopeArguments {
+    if ($InstallScope -eq 'AllUsers') {
+        return @('--scope', 'machine')
+    }
+
+    return @()
 }
 
 function Get-PhpExecutable {
@@ -148,7 +179,7 @@ function Install-PhpIfRequested {
             return
         }
 
-        Add-UserPathEntry -Directory (Split-Path -Path $phpExecutable -Parent)
+        Add-PathEntry -Directory (Split-Path -Path $phpExecutable -Parent)
         Write-Step "Using PHP: $phpExecutable"
         return
     }
@@ -160,7 +191,7 @@ function Install-PhpIfRequested {
     if (Get-Command php -ErrorAction SilentlyContinue) {
         if ($UpdateTools -and (Get-Command winget -ErrorAction SilentlyContinue)) {
             try {
-                Invoke-ExternalCommand -FilePath 'winget' -Arguments @(
+                $wingetArguments = @(
                     'upgrade',
                     '--id',
                     'PHP.PHP.8.4',
@@ -169,7 +200,8 @@ function Install-PhpIfRequested {
                     'winget',
                     '--accept-package-agreements',
                     '--accept-source-agreements'
-                ) -Description 'Updating PHP 8.4 through winget.'
+                ) + (Get-WingetScopeArguments)
+                Invoke-ExternalCommand -FilePath 'winget' -Arguments $wingetArguments -Description 'Updating PHP 8.4 through winget.'
                 Refresh-ProcessPath
             } catch {
                 Write-SoftWarning "Could not update PHP automatically. $($_.Exception.Message)"
@@ -186,7 +218,7 @@ function Install-PhpIfRequested {
     }
 
     try {
-        Invoke-ExternalCommand -FilePath 'winget' -Arguments @(
+        $wingetArguments = @(
             'install',
             '--id',
             'PHP.PHP.8.4',
@@ -195,7 +227,8 @@ function Install-PhpIfRequested {
             'winget',
             '--accept-package-agreements',
             '--accept-source-agreements'
-        ) -Description 'Installing PHP 8.4 through winget.'
+        ) + (Get-WingetScopeArguments)
+        Invoke-ExternalCommand -FilePath 'winget' -Arguments $wingetArguments -Description 'Installing PHP 8.4 through winget.'
         Refresh-ProcessPath
     } catch {
         Write-SoftWarning "Could not install PHP automatically. $($_.Exception.Message)"
@@ -218,7 +251,7 @@ function Install-ComposerIfRequested {
         } else {
             Write-Step 'Composer is already available.'
         }
-        Add-UserPathEntry -Directory (Get-ComposerGlobalBin)
+        Add-PathEntry -Directory (Get-ComposerGlobalBin)
         return
     }
 
@@ -238,9 +271,16 @@ function Install-ComposerIfRequested {
         $setupArguments = @(
             '/VERYSILENT',
             '/SUPPRESSMSGBOXES',
-            '/NORESTART',
-            "/PHP=$phpExecutable"
+            '/NORESTART'
         )
+
+        if ($InstallScope -eq 'AllUsers') {
+            $setupArguments += '/ALLUSERS'
+        } else {
+            $setupArguments += '/CURRENTUSER'
+        }
+
+        $setupArguments += "/PHP=$phpExecutable"
 
         $process = Start-Process -FilePath $setupPath -ArgumentList $setupArguments -Wait -PassThru
 
@@ -249,7 +289,7 @@ function Install-ComposerIfRequested {
         }
 
         Refresh-ProcessPath
-        Add-UserPathEntry -Directory (Get-ComposerGlobalBin)
+        Add-PathEntry -Directory (Get-ComposerGlobalBin)
 
         if (Get-Command composer -ErrorAction SilentlyContinue) {
             Write-Step 'Composer installed.'
@@ -287,7 +327,7 @@ function Install-ComposerGlobalPackage {
             'require',
             $PackageName
         ) -Description "Installing $Label with Composer."
-        Add-UserPathEntry -Directory (Get-ComposerGlobalBin)
+        Add-PathEntry -Directory (Get-ComposerGlobalBin)
         Refresh-ProcessPath
         return $true
     } catch {

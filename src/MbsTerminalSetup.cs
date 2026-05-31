@@ -711,13 +711,26 @@ namespace MbsTerminalSetup
             title.MouseDown += TitleBarMouseDown;
             header.Controls.Add(title);
 
-            Label minimizeButton = CreateWindowButton("-", Width - 88, 0);
+            Label minimizeButton = CreateWindowButton("_", 0, 0);
             minimizeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            minimizeButton.Location = new Point(header.Width - 132, 0);
             minimizeButton.Click += delegate { WindowState = FormWindowState.Minimized; };
             header.Controls.Add(minimizeButton);
 
-            Label closeButton = CreateWindowButton("x", Width - 44, 0);
+            Label maximizeButton = CreateWindowButton("□", 0, 0);
+            maximizeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            maximizeButton.Location = new Point(header.Width - 88, 0);
+            maximizeButton.Click += delegate
+            {
+                WindowState = WindowState == FormWindowState.Maximized
+                    ? FormWindowState.Normal
+                    : FormWindowState.Maximized;
+            };
+            header.Controls.Add(maximizeButton);
+
+            Label closeButton = CreateWindowButton("X", 0, 0);
             closeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            closeButton.Location = new Point(header.Width - 44, 0);
             closeButton.Click += delegate { Close(); };
             header.Controls.Add(closeButton);
 
@@ -730,14 +743,22 @@ namespace MbsTerminalSetup
             button.AutoSize = false;
             button.Text = text;
             button.TextAlign = ContentAlignment.MiddleCenter;
-            button.Font = CreateFont(11F, FontStyle.Bold);
-            button.ForeColor = MutedTextColor;
-            button.BackColor = Color.Transparent;
+            button.Font = CreateFont(10.5F, FontStyle.Bold);
+            button.ForeColor = TextColor;
+            button.BackColor = Color.FromArgb(24, 24, 34);
             button.Location = new Point(left, top);
             button.Size = new Size(44, 44);
             button.Cursor = Cursors.Hand;
-            button.MouseEnter += delegate { button.BackColor = SurfaceAltColor; button.ForeColor = TextColor; };
-            button.MouseLeave += delegate { button.BackColor = Color.Transparent; button.ForeColor = MutedTextColor; };
+            button.MouseEnter += delegate
+            {
+                button.BackColor = text == "X" ? DangerColor : Color.FromArgb(37, 38, 50);
+                button.ForeColor = Color.White;
+            };
+            button.MouseLeave += delegate
+            {
+                button.BackColor = Color.FromArgb(24, 24, 34);
+                button.ForeColor = TextColor;
+            };
             return button;
         }
 

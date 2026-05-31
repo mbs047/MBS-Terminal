@@ -638,10 +638,43 @@ namespace MbsTerminalSetup
 
             if (string.IsNullOrWhiteSpace(root))
             {
-                return Environment.CurrentDirectory;
+                root = Environment.CurrentDirectory;
+            }
+
+            if (File.Exists(Path.Combine(root, "install.ps1")))
+            {
+                return root;
+            }
+
+            string embeddedRoot = ExtractEmbeddedSupportFiles();
+
+            if (!string.IsNullOrWhiteSpace(embeddedRoot) && File.Exists(Path.Combine(embeddedRoot, "install.ps1")))
+            {
+                return embeddedRoot;
             }
 
             return root;
+        }
+
+        private static string ExtractEmbeddedSupportFiles()
+        {
+            try
+            {
+                string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+                if (string.IsNullOrWhiteSpace(localAppData))
+                {
+                    localAppData = Path.GetTempPath();
+                }
+
+                string supportRoot = Path.Combine(localAppData, "MBS-Terminal", "SetupSupport", "v1.0.0");
+                EmbeddedSupportFiles.ExtractTo(supportRoot);
+                return supportRoot;
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
 
         private Icon LoadWindowIcon()

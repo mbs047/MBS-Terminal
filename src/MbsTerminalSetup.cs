@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Forms;
 
 namespace MbsTerminalSetup
@@ -35,6 +36,7 @@ namespace MbsTerminalSetup
         public bool InstallComposer { get; set; }
         public bool InstallLaravel { get; set; }
         public bool InstallValet { get; set; }
+        public bool UpdateTools { get; set; }
 
         public static InstallerOptions FromArgs(string[] args)
         {
@@ -74,6 +76,12 @@ namespace MbsTerminalSetup
                     continue;
                 }
 
+                if (IsSwitch(argument, "UpdateTools"))
+                {
+                    options.UpdateTools = true;
+                    continue;
+                }
+
                 if (IsSwitch(argument, "StartingDirectory") && index + 1 < args.Length)
                 {
                     options.StartingDirectory = args[index + 1];
@@ -100,38 +108,72 @@ namespace MbsTerminalSetup
 
     internal sealed class InstallerForm : Form
     {
-        private static readonly Color BackgroundColor = Color.FromArgb(8, 12, 20);
-        private static readonly Color HeaderStartColor = Color.FromArgb(13, 25, 42);
-        private static readonly Color HeaderEndColor = Color.FromArgb(30, 67, 88);
-        private static readonly Color SurfaceColor = Color.FromArgb(16, 23, 36);
-        private static readonly Color SurfaceAltColor = Color.FromArgb(22, 32, 48);
-        private static readonly Color FieldColor = Color.FromArgb(10, 16, 26);
-        private static readonly Color BorderColor = Color.FromArgb(44, 59, 80);
-        private static readonly Color TextColor = Color.FromArgb(238, 244, 249);
-        private static readonly Color MutedTextColor = Color.FromArgb(158, 171, 188);
-        private static readonly Color AccentColor = Color.FromArgb(46, 204, 160);
-        private static readonly Color AccentAltColor = Color.FromArgb(92, 153, 255);
-        private static readonly Color WarningColor = Color.FromArgb(246, 190, 100);
-        private static readonly Color DangerColor = Color.FromArgb(248, 113, 113);
+        private const int WizardContentWidth = 520;
+        private const int StepCount = 4;
+
+        private static readonly Color BackgroundColor = Color.FromArgb(15, 23, 42);
+        private static readonly Color HeaderStartColor = Color.FromArgb(8, 14, 26);
+        private static readonly Color HeaderEndColor = Color.FromArgb(19, 58, 72);
+        private static readonly Color SurfaceColor = Color.FromArgb(27, 35, 54);
+        private static readonly Color SurfaceAltColor = Color.FromArgb(39, 47, 66);
+        private static readonly Color SelectedSurfaceColor = Color.FromArgb(24, 48, 49);
+        private static readonly Color FieldColor = Color.FromArgb(12, 19, 34);
+        private static readonly Color BorderColor = Color.FromArgb(71, 85, 105);
+        private static readonly Color TextColor = Color.FromArgb(248, 250, 252);
+        private static readonly Color MutedTextColor = Color.FromArgb(148, 163, 184);
+        private static readonly Color AccentColor = Color.FromArgb(34, 197, 94);
+        private static readonly Color AccentAltColor = Color.FromArgb(59, 130, 246);
+        private static readonly Color WarningColor = Color.FromArgb(245, 158, 11);
+        private static readonly Color DangerColor = Color.FromArgb(239, 68, 68);
 
         private readonly string repositoryRoot;
         private readonly string installerPath;
         private readonly string iconPath;
-        private readonly TextBox startingDirectoryBox;
-        private readonly TextBox phpDirectoryBox;
-        private readonly CheckBox installStarshipBox;
-        private readonly CheckBox installPhpBox;
-        private readonly CheckBox installComposerBox;
-        private readonly CheckBox installLaravelBox;
-        private readonly CheckBox installValetBox;
-        private readonly Button installButton;
-        private readonly Button cancelButton;
-        private readonly Button closeButton;
-        private readonly ProgressBar progressBar;
-        private readonly Label statusLabel;
-        private readonly RichTextBox logBox;
+        private readonly List<Control> wizardPages = new List<Control>();
+        private readonly Label[] stepLabels = new Label[StepCount];
+        private readonly string[] stepTitles =
+        {
+            "Profile",
+            "Runtime",
+            "Tooling",
+            "Review"
+        };
+        private readonly string[] wizardTitles =
+        {
+            "Terminal Profile",
+            "PHP Runtime",
+            "Select Other Tooling",
+            "Review & Install"
+        };
+        private readonly string[] wizardDescriptions =
+        {
+            "Set the Windows Terminal starting folder and optional prompt dependency.",
+            "Install PHP automatically, use an existing PHP folder, and prepare Composer.",
+            "See what is already installed, then choose Laravel, Valet, and update behavior.",
+            "Confirm the plan, then run the installer with live progress."
+        };
 
+        private TextBox startingDirectoryBox;
+        private TextBox phpDirectoryBox;
+        private ModernCheckBox installStarshipBox;
+        private ModernCheckBox installPhpBox;
+        private ModernCheckBox installComposerBox;
+        private ModernCheckBox installLaravelBox;
+        private ModernCheckBox installValetBox;
+        private ModernCheckBox updateToolsBox;
+        private Label wizardTitleLabel;
+        private Label wizardDescriptionLabel;
+        private Label reviewSummaryLabel;
+        private Button backButton;
+        private Button nextButton;
+        private Button installButton;
+        private Button cancelButton;
+        private Button closeButton;
+        private ProgressBar progressBar;
+        private Label statusLabel;
+        private RichTextBox logBox;
         private Process installerProcess;
+        private int currentStep;
 
         public InstallerForm(InstallerOptions options)
         {
@@ -142,8 +184,8 @@ namespace MbsTerminalSetup
             ExitCode = 0;
             Text = "MBS Terminal Setup";
             StartPosition = FormStartPosition.CenterScreen;
-            MinimumSize = new Size(1040, 720);
-            Size = new Size(1120, 780);
+            MinimumSize = new Size(1180, 760);
+            Size = new Size(1240, 820);
             BackColor = BackgroundColor;
             ForeColor = TextColor;
             Font = CreateFont(9F, FontStyle.Regular);
@@ -158,56 +200,53 @@ namespace MbsTerminalSetup
             TableLayoutPanel body = CreateBodyLayout();
             shell.Controls.Add(body, 0, 1);
 
-            Panel setupPanel = CreatePanel();
-            body.Controls.Add(setupPanel, 0, 0);
+            Panel wizardPanel = CreatePanel();
+            body.Controls.Add(wizardPanel, 0, 0);
 
-            FlowLayoutPanel setupFlow = CreateSetupFlow();
-            setupPanel.Controls.Add(setupFlow);
+            TableLayoutPanel wizardLayout = CreateWizardLayout();
+            wizardPanel.Controls.Add(wizardLayout);
 
-            setupFlow.Controls.Add(CreateSectionTitle("Terminal Profile", "Theme, icons, prompt, and the default folder for new tabs."));
-            setupFlow.Controls.Add(CreatePathPicker("Starting directory", ResolveStartingDirectory(options.StartingDirectory), BrowseStartingDirectoryClick, out startingDirectoryBox));
+            wizardLayout.Controls.Add(CreateStepper(), 0, 0);
 
-            setupFlow.Controls.Add(CreateSectionTitle("PHP Runtime", "Install PHP automatically, or point the installer at an existing PHP folder."));
-            installPhpBox = CreateOptionRow(
-                "Install PHP 8.4",
-                "Uses winget package PHP.PHP.8.4.",
-                options.InstallPhp
-            );
-            setupFlow.Controls.Add(installPhpBox.Parent);
-            setupFlow.Controls.Add(CreatePathPicker("Existing PHP directory", options.PhpDirectory ?? string.Empty, BrowsePhpDirectoryClick, out phpDirectoryBox));
+            Panel titlePanel = new Panel();
+            titlePanel.Dock = DockStyle.Fill;
+            titlePanel.BackColor = SurfaceColor;
+            titlePanel.Margin = new Padding(22, 8, 22, 0);
+            wizardTitleLabel = CreateLabel(string.Empty, 20F, FontStyle.Bold, TextColor);
+            wizardTitleLabel.Location = new Point(0, 0);
+            wizardTitleLabel.Size = new Size(WizardContentWidth, 36);
+            wizardTitleLabel.Dock = DockStyle.None;
+            titlePanel.Controls.Add(wizardTitleLabel);
 
-            setupFlow.Controls.Add(CreateSectionTitle("Laravel Tooling", "Composer is required for the Laravel Installer and Valet for Windows."));
-            installComposerBox = CreateOptionRow(
-                "Install Composer",
-                "Downloads Composer-Setup.exe and runs it silently with your PHP selection.",
-                options.InstallComposer
-            );
-            setupFlow.Controls.Add(installComposerBox.Parent);
+            wizardDescriptionLabel = CreateLabel(string.Empty, 9.5F, FontStyle.Regular, MutedTextColor);
+            wizardDescriptionLabel.Location = new Point(0, 38);
+            wizardDescriptionLabel.Size = new Size(WizardContentWidth, 28);
+            wizardDescriptionLabel.Dock = DockStyle.None;
+            titlePanel.Controls.Add(wizardDescriptionLabel);
+            wizardLayout.Controls.Add(titlePanel, 0, 1);
 
-            installLaravelBox = CreateOptionRow(
-                "Install Laravel Installer",
-                "Runs composer global require laravel/installer.",
-                options.InstallLaravel
-            );
-            setupFlow.Controls.Add(installLaravelBox.Parent);
+            RoundedPanel wizardHost = new RoundedPanel();
+            wizardHost.Dock = DockStyle.Fill;
+            wizardHost.Margin = new Padding(22, 10, 22, 12);
+            wizardHost.FillColor = Color.FromArgb(21, 30, 47);
+            wizardHost.BorderColor = Color.FromArgb(54, 68, 91);
+            wizardHost.Radius = 8;
+            wizardHost.Padding = new Padding(1);
+            wizardLayout.Controls.Add(wizardHost, 0, 2);
 
-            installValetBox = CreateOptionRow(
-                "Install Valet for Windows",
-                "Runs composer global require ycodetech/valet-windows, then valet install.",
-                options.InstallValet
-            );
-            setupFlow.Controls.Add(installValetBox.Parent);
+            wizardPages.Add(CreateProfilePage(options));
+            wizardPages.Add(CreateRuntimePage(options));
+            wizardPages.Add(CreateLaravelPage(options));
+            wizardPages.Add(CreateReviewPage());
 
-            setupFlow.Controls.Add(CreateSectionTitle("Prompt Dependency", "Starship is optional but recommended for the bundled prompt."));
-            installStarshipBox = CreateOptionRow(
-                "Install missing Starship with winget",
-                "Keeps the terminal prompt fully themed when Starship is not already installed.",
-                options.InstallDependencies
-            );
-            setupFlow.Controls.Add(installStarshipBox.Parent);
+            foreach (Control page in wizardPages)
+            {
+                page.Dock = DockStyle.Fill;
+                page.Visible = false;
+                wizardHost.Controls.Add(page);
+            }
 
-            installLaravelBox.CheckedChanged += ToolingOptionChanged;
-            installValetBox.CheckedChanged += ToolingOptionChanged;
+            wizardLayout.Controls.Add(CreateWizardNav(), 0, 3);
 
             Panel runPanel = CreatePanel();
             body.Controls.Add(runPanel, 1, 0);
@@ -219,12 +258,23 @@ namespace MbsTerminalSetup
             runLayout.Controls.Add(runTitle, 0, 0);
 
             Label runText = CreateLabel(
-                "Review your choices, then run the setup. Progress and command output stay here.",
+                "The final step runs install.ps1 without opening a terminal. Output stays here.",
                 9.5F,
                 FontStyle.Regular,
                 MutedTextColor
             );
             runLayout.Controls.Add(runText, 0, 1);
+
+            FlowLayoutPanel trustPanel = new FlowLayoutPanel();
+            trustPanel.Dock = DockStyle.Fill;
+            trustPanel.FlowDirection = FlowDirection.LeftToRight;
+            trustPanel.WrapContents = false;
+            trustPanel.BackColor = SurfaceColor;
+            trustPanel.Margin = new Padding(0, 0, 0, 8);
+            trustPanel.Controls.Add(CreateStatusBadge("Backups"));
+            trustPanel.Controls.Add(CreateStatusBadge("PATH updates"));
+            trustPanel.Controls.Add(CreateStatusBadge("Hidden shell"));
+            runLayout.Controls.Add(trustPanel, 0, 2);
 
             FlowLayoutPanel actionPanel = new FlowLayoutPanel();
             actionPanel.Dock = DockStyle.Fill;
@@ -232,7 +282,7 @@ namespace MbsTerminalSetup
             actionPanel.WrapContents = false;
             actionPanel.BackColor = SurfaceColor;
             actionPanel.Margin = new Padding(0, 4, 0, 12);
-            runLayout.Controls.Add(actionPanel, 0, 2);
+            runLayout.Controls.Add(actionPanel, 0, 3);
 
             installButton = CreatePrimaryButton("Install");
             installButton.Width = 136;
@@ -255,10 +305,10 @@ namespace MbsTerminalSetup
             progressBar.Height = 14;
             progressBar.Margin = new Padding(0, 4, 0, 10);
             progressBar.Style = ProgressBarStyle.Blocks;
-            runLayout.Controls.Add(progressBar, 0, 3);
+            runLayout.Controls.Add(progressBar, 0, 4);
 
-            statusLabel = CreateLabel("Ready to install", 11F, FontStyle.Bold, TextColor);
-            runLayout.Controls.Add(statusLabel, 0, 4);
+            statusLabel = CreateLabel("Ready to configure", 11F, FontStyle.Bold, TextColor);
+            runLayout.Controls.Add(statusLabel, 0, 5);
 
             logBox = new RichTextBox();
             logBox.BackColor = Color.FromArgb(6, 10, 17);
@@ -269,12 +319,24 @@ namespace MbsTerminalSetup
             logBox.ReadOnly = true;
             logBox.Margin = new Padding(0);
             logBox.DetectUrls = false;
-            runLayout.Controls.Add(logBox, 0, 5);
+            runLayout.Controls.Add(logBox, 0, 6);
+
+            installLaravelBox.CheckedChanged += ToolingOptionChanged;
+            installValetBox.CheckedChanged += ToolingOptionChanged;
 
             FormClosing += InstallerFormClosing;
 
-            AppendLog("Ready. Select what this machine needs, then install.", MutedTextColor);
+            AppendLog("Wizard ready. Configure each step, then install.", MutedTextColor);
             AppendLog("Tip: if you already use Laragon, XAMPP, or a custom PHP build, select its PHP folder instead of installing PHP.", MutedTextColor);
+
+            UpdateWizard();
+
+            Shown += delegate
+            {
+                startingDirectoryBox.SelectionLength = 0;
+                phpDirectoryBox.SelectionLength = 0;
+                ActiveControl = nextButton;
+            };
         }
 
         public int ExitCode { get; private set; }
@@ -336,12 +398,12 @@ namespace MbsTerminalSetup
 
         private static Font CreateFont(float size, FontStyle style)
         {
-            return new Font(ResolveFontFamily("Aptos", "Segoe UI Variable Display", "Segoe UI"), size, style, GraphicsUnit.Point);
+            return new Font(ResolveFontFamily("IBM Plex Sans", "Aptos", "Segoe UI Variable Display", "Segoe UI"), size, style, GraphicsUnit.Point);
         }
 
         private static Font CreateMonoFont(float size)
         {
-            return new Font(ResolveFontFamily("Cascadia Mono", "Consolas", "Courier New"), size, FontStyle.Regular, GraphicsUnit.Point);
+            return new Font(ResolveFontFamily("JetBrains Mono", "Cascadia Mono", "Consolas", "Courier New"), size, FontStyle.Regular, GraphicsUnit.Point);
         }
 
         private static string ResolveFontFamily(params string[] names)
@@ -396,18 +458,13 @@ namespace MbsTerminalSetup
 
             header.Controls.Add(icon);
 
-            Label eyebrow = CreateFloatingLabel("MBS TERMINAL", 9F, FontStyle.Bold, Color.FromArgb(194, 239, 226), 132, 30, 440, 24);
-            header.Controls.Add(eyebrow);
+            header.Controls.Add(CreateFloatingLabel("MBS TERMINAL / DEV TOOLCHAIN", 9F, FontStyle.Bold, Color.FromArgb(194, 239, 226), 132, 30, 520, 24));
+            header.Controls.Add(CreateFloatingLabel("Laravel Ready Wizard", 31F, FontStyle.Bold, Color.White, 128, 54, 600, 54));
+            header.Controls.Add(CreateFloatingLabel("A staged desktop setup for your terminal profile, PHP runtime, Composer, Laravel, and Valet for Windows.", 10.5F, FontStyle.Regular, Color.FromArgb(216, 227, 238), 132, 108, 840, 28));
 
-            Label title = CreateFloatingLabel("Laravel Ready Setup", 30F, FontStyle.Bold, Color.White, 128, 54, 560, 54);
-            header.Controls.Add(title);
-
-            Label subtitle = CreateFloatingLabel("A desktop installer for your terminal profile, PHP runtime, Composer, Laravel, and Valet for Windows.", 10.5F, FontStyle.Regular, Color.FromArgb(216, 227, 238), 132, 108, 760, 28);
-            header.Controls.Add(subtitle);
-
-            AddPill(header, "PHP", 770, 40, AccentColor);
-            AddPill(header, "Composer", 842, 40, AccentAltColor);
-            AddPill(header, "Valet", 950, 40, WarningColor);
+            AddPill(header, "Dark Minimal", 790, 40, AccentColor);
+            AddPill(header, "Wizard Flow", 910, 40, AccentAltColor);
+            AddPill(header, "WCAG AA", 1030, 40, WarningColor);
 
             return header;
         }
@@ -434,44 +491,84 @@ namespace MbsTerminalSetup
             body.ColumnCount = 2;
             body.RowCount = 1;
             body.Padding = new Padding(18);
-            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 53F));
-            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 47F));
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52F));
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48F));
             body.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             return body;
         }
 
         private static Panel CreatePanel()
         {
-            Panel panel = new Panel();
+            RoundedPanel panel = new RoundedPanel();
             panel.Dock = DockStyle.Fill;
-            panel.BackColor = SurfaceColor;
+            panel.BackColor = BackgroundColor;
+            panel.FillColor = SurfaceColor;
+            panel.BorderColor = Color.FromArgb(57, 72, 96);
+            panel.Radius = 8;
             panel.Margin = new Padding(10);
             panel.Padding = new Padding(1);
             return panel;
         }
 
-        private static FlowLayoutPanel CreateSetupFlow()
-        {
-            FlowLayoutPanel flow = new FlowLayoutPanel();
-            flow.Dock = DockStyle.Fill;
-            flow.FlowDirection = FlowDirection.TopDown;
-            flow.WrapContents = false;
-            flow.AutoScroll = true;
-            flow.BackColor = SurfaceColor;
-            flow.Padding = new Padding(20, 18, 20, 18);
-            return flow;
-        }
-
-        private static TableLayoutPanel CreateRunLayout()
+        private static TableLayoutPanel CreateWizardLayout()
         {
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.ColumnCount = 1;
-            layout.RowCount = 6;
+            layout.RowCount = 4;
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = SurfaceColor;
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 92F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 84F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68F));
+            return layout;
+        }
+
+        private TableLayoutPanel CreateStepper()
+        {
+            TableLayoutPanel stepper = new TableLayoutPanel();
+            stepper.ColumnCount = StepCount;
+            stepper.RowCount = 1;
+            stepper.Dock = DockStyle.Fill;
+            stepper.BackColor = SurfaceColor;
+            stepper.Padding = new Padding(22, 20, 22, 8);
+
+            for (int index = 0; index < StepCount; index++)
+            {
+                stepper.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+
+                Label step = new Label();
+                step.AutoSize = false;
+                step.Dock = DockStyle.Fill;
+                step.Margin = new Padding(0, 0, 10, 0);
+                step.TextAlign = ContentAlignment.MiddleCenter;
+                step.Font = CreateFont(9F, FontStyle.Bold);
+                step.Text = (index + 1) + "  " + stepTitles[index];
+                step.Cursor = Cursors.Hand;
+                int capturedIndex = index;
+                step.Click += delegate
+                {
+                    currentStep = capturedIndex;
+                    UpdateWizard();
+                };
+                stepLabels[index] = step;
+                stepper.Controls.Add(step, index, 0);
+            }
+
+            return stepper;
+        }
+
+        private TableLayoutPanel CreateRunLayout()
+        {
+            TableLayoutPanel layout = new TableLayoutPanel();
+            layout.ColumnCount = 1;
+            layout.RowCount = 7;
             layout.Dock = DockStyle.Fill;
             layout.BackColor = SurfaceColor;
             layout.Padding = new Padding(22);
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 60F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
@@ -479,39 +576,243 @@ namespace MbsTerminalSetup
             return layout;
         }
 
-        private static Control CreateSectionTitle(string title, string subtitle)
+        private Control CreateProfilePage(InstallerOptions options)
         {
-            Panel panel = new Panel();
-            panel.Width = 462;
-            panel.Height = 72;
-            panel.Margin = new Padding(0, 4, 0, 2);
-            panel.BackColor = SurfaceColor;
+            FlowLayoutPanel page = CreateWizardPage();
+            page.Controls.Add(CreateSummaryGrid("Profile", "Terminal theme, PowerShell profile helpers, icons, Starship config, and Windows Terminal settings."));
+            page.Controls.Add(CreatePathPicker("Starting directory", ResolveStartingDirectory(options.StartingDirectory), BrowseStartingDirectoryClick, out startingDirectoryBox));
+            installStarshipBox = CreateOptionRow(
+                "Install missing Starship with winget",
+                "Keeps the terminal prompt fully themed when Starship is not already installed.",
+                options.InstallDependencies
+            );
+            page.Controls.Add(installStarshipBox.Parent);
+            return page;
+        }
 
-            Label titleLabel = CreateFloatingLabel(title, 13F, FontStyle.Bold, TextColor, 0, 4, 420, 26);
-            panel.Controls.Add(titleLabel);
+        private Control CreateRuntimePage(InstallerOptions options)
+        {
+            FlowLayoutPanel page = CreateWizardPage();
+            page.Controls.Add(CreateSummaryGrid("Runtime", "Choose how PHP and Composer should be prepared for Laravel tooling."));
+            installPhpBox = CreateOptionRow(
+                "Install PHP 8.4",
+                "Uses winget package PHP.PHP.8.4.",
+                options.InstallPhp
+            );
+            page.Controls.Add(installPhpBox.Parent);
+            page.Controls.Add(CreatePathPicker("Existing PHP directory", options.PhpDirectory ?? string.Empty, BrowsePhpDirectoryClick, out phpDirectoryBox));
+            installComposerBox = CreateOptionRow(
+                "Install Composer",
+                "Downloads Composer-Setup.exe and runs it silently with your PHP selection.",
+                options.InstallComposer
+            );
+            page.Controls.Add(installComposerBox.Parent);
+            return page;
+        }
 
-            Label subtitleLabel = CreateFloatingLabel(subtitle, 8.8F, FontStyle.Regular, MutedTextColor, 0, 32, 440, 34);
-            panel.Controls.Add(subtitleLabel);
+        private Control CreateLaravelPage(InstallerOptions options)
+        {
+            FlowLayoutPanel page = CreateWizardPage();
+            page.Controls.Add(CreateSummaryGrid("Tooling", "Install global developer tools after Composer is ready."));
+            page.Controls.Add(CreateDetectedToolsCard());
+            updateToolsBox = CreateOptionRow(
+                "Update tooling that is already installed",
+                "Refreshes PHP with winget and Composer with self-update when selected.",
+                options.UpdateTools
+            );
+            page.Controls.Add(updateToolsBox.Parent);
+            installLaravelBox = CreateOptionRow(
+                "Install Laravel Installer",
+                "Runs composer global require laravel/installer.",
+                options.InstallLaravel
+            );
+            page.Controls.Add(installLaravelBox.Parent);
+            installValetBox = CreateOptionRow(
+                "Install Valet for Windows",
+                "Runs composer global require ycodetech/valet-windows, then valet install.",
+                options.InstallValet
+            );
+            page.Controls.Add(installValetBox.Parent);
+            page.Controls.Add(CreateNoteCard("Composer will be selected automatically when Laravel Installer or Valet is enabled."));
+            return page;
+        }
 
-            return panel;
+        private Control CreateReviewPage()
+        {
+            FlowLayoutPanel page = CreateWizardPage();
+            page.Controls.Add(CreateSummaryGrid("Review", "Confirm the exact command plan before anything changes on the machine."));
+
+            RoundedPanel reviewCard = new RoundedPanel();
+            reviewCard.Width = WizardContentWidth;
+            reviewCard.Height = 250;
+            reviewCard.Margin = new Padding(0, 0, 0, 12);
+            reviewCard.FillColor = FieldColor;
+            reviewCard.BorderColor = Color.FromArgb(54, 68, 91);
+            reviewCard.Radius = 8;
+            reviewCard.BackColor = Color.FromArgb(21, 30, 47);
+
+            reviewSummaryLabel = CreateFloatingLabel(string.Empty, 9.4F, FontStyle.Regular, TextColor, 18, 16, 480, 216);
+            reviewSummaryLabel.Font = CreateMonoFont(9.2F);
+            reviewSummaryLabel.TextAlign = ContentAlignment.TopLeft;
+            reviewCard.Controls.Add(reviewSummaryLabel);
+            page.Controls.Add(reviewCard);
+            page.Controls.Add(CreateNoteCard("Click Install only when this summary matches what you want for this Windows machine."));
+            return page;
+        }
+
+        private static FlowLayoutPanel CreateWizardPage()
+        {
+            FlowLayoutPanel page = new FlowLayoutPanel();
+            page.FlowDirection = FlowDirection.TopDown;
+            page.WrapContents = false;
+            page.AutoScroll = true;
+            page.BackColor = Color.FromArgb(21, 30, 47);
+            page.Padding = new Padding(22, 22, 22, 18);
+            return page;
+        }
+
+        private static Control CreateSummaryGrid(string title, string body)
+        {
+            RoundedPanel card = new RoundedPanel();
+            card.Width = WizardContentWidth;
+            card.Height = 92;
+            card.Margin = new Padding(0, 0, 0, 14);
+            card.FillColor = Color.FromArgb(18, 27, 43);
+            card.BorderColor = Color.FromArgb(54, 68, 91);
+            card.Radius = 8;
+            card.BackColor = Color.FromArgb(21, 30, 47);
+
+            Panel accent = new Panel();
+            accent.BackColor = AccentColor;
+            accent.Location = new Point(18, 20);
+            accent.Size = new Size(4, 50);
+            card.Controls.Add(accent);
+
+            card.Controls.Add(CreateFloatingLabel(title, 13F, FontStyle.Bold, TextColor, 34, 18, 450, 28));
+            card.Controls.Add(CreateFloatingLabel(body, 9F, FontStyle.Regular, MutedTextColor, 34, 48, 454, 34));
+            return card;
+        }
+
+        private static Control CreateNoteCard(string text)
+        {
+            RoundedPanel card = new RoundedPanel();
+            card.Width = WizardContentWidth;
+            card.Height = 72;
+            card.Margin = new Padding(0, 0, 0, 12);
+            card.FillColor = Color.FromArgb(28, 47, 58);
+            card.BorderColor = Color.FromArgb(53, 88, 104);
+            card.Radius = 8;
+            card.BackColor = Color.FromArgb(21, 30, 47);
+            card.Controls.Add(CreateFloatingLabel(text, 9.2F, FontStyle.Regular, Color.FromArgb(210, 232, 238), 18, 14, 480, 40));
+            return card;
+        }
+
+        private static Control CreateDetectedToolsCard()
+        {
+            RoundedPanel card = new RoundedPanel();
+            card.Width = WizardContentWidth;
+            card.Height = 96;
+            card.Margin = new Padding(0, 0, 0, 12);
+            card.FillColor = Color.FromArgb(55, 43, 25);
+            card.BorderColor = Color.FromArgb(135, 94, 38);
+            card.Radius = 8;
+            card.BackColor = Color.FromArgb(21, 30, 47);
+
+            card.Controls.Add(CreateFloatingLabel("Detected installed tooling", 10.2F, FontStyle.Bold, WarningColor, 18, 12, 460, 24));
+            card.Controls.Add(CreateFloatingLabel(BuildDetectedToolsMessage(), 8.8F, FontStyle.Regular, Color.FromArgb(255, 224, 178), 18, 40, 478, 44));
+            return card;
+        }
+
+        private static string BuildDetectedToolsMessage()
+        {
+            List<string> installed = new List<string>();
+
+            AddDetectedTool(installed, "php", "PHP");
+            AddDetectedTool(installed, "composer", "Composer");
+            AddDetectedTool(installed, "laravel", "Laravel Installer");
+            AddDetectedTool(installed, "valet", "Valet");
+            AddDetectedTool(installed, "starship", "Starship");
+
+            if (installed.Count == 0)
+            {
+                return "No PHP/Laravel tooling was detected on PATH. You can install it in this wizard.";
+            }
+
+            return "Already on PATH: " + string.Join(", ", installed.ToArray()) + ". Enable the update option to refresh selected tooling.";
+        }
+
+        private static void AddDetectedTool(List<string> installed, string command, string label)
+        {
+            if (!string.IsNullOrWhiteSpace(FindCommand(command)))
+            {
+                installed.Add(label);
+            }
+        }
+
+        private static string FindCommand(string command)
+        {
+            try
+            {
+                ProcessStartInfo startInfo = new ProcessStartInfo();
+                startInfo.FileName = "cmd.exe";
+                startInfo.Arguments = "/c where " + command;
+                startInfo.CreateNoWindow = true;
+                startInfo.UseShellExecute = false;
+                startInfo.RedirectStandardOutput = true;
+                startInfo.RedirectStandardError = true;
+
+                using (Process process = Process.Start(startInfo))
+                {
+                    if (process == null)
+                    {
+                        return string.Empty;
+                    }
+
+                    string output = process.StandardOutput.ReadLine();
+                    bool exited = process.WaitForExit(1500);
+
+                    if (!exited)
+                    {
+                        try
+                        {
+                            process.Kill();
+                        }
+                        catch
+                        {
+                        }
+
+                        return string.Empty;
+                    }
+
+                    if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(output))
+                    {
+                        return output.Trim();
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return string.Empty;
         }
 
         private static Control CreatePathPicker(string title, string value, EventHandler browseHandler, out TextBox textBox)
         {
             Panel panel = new Panel();
-            panel.Width = 462;
+            panel.Width = WizardContentWidth;
             panel.Height = 78;
             panel.Margin = new Padding(0, 0, 0, 12);
-            panel.BackColor = SurfaceColor;
+            panel.BackColor = Color.FromArgb(21, 30, 47);
 
-            Label label = CreateFloatingLabel(title, 8.8F, FontStyle.Bold, TextColor, 0, 0, 420, 22);
+            Label label = CreateFloatingLabel(title, 8.8F, FontStyle.Bold, TextColor, 0, 0, 460, 22);
             panel.Controls.Add(label);
 
             TableLayoutPanel picker = new TableLayoutPanel();
             picker.ColumnCount = 2;
             picker.RowCount = 1;
             picker.Location = new Point(0, 28);
-            picker.Size = new Size(440, 40);
+            picker.Size = new Size(500, 40);
             picker.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             picker.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104F));
 
@@ -535,46 +836,109 @@ namespace MbsTerminalSetup
             return panel;
         }
 
-        private CheckBox CreateOptionRow(string title, string description, bool isChecked)
+        private ModernCheckBox CreateOptionRow(string title, string description, bool isChecked)
         {
-            Panel panel = new Panel();
-            panel.Width = 462;
+            RoundedPanel panel = new RoundedPanel();
+            panel.Width = WizardContentWidth;
             panel.Height = 74;
             panel.Margin = new Padding(0, 0, 0, 10);
-            panel.BackColor = SurfaceAltColor;
+            panel.BackColor = Color.FromArgb(21, 30, 47);
+            panel.FillColor = SurfaceAltColor;
+            panel.BorderColor = Color.FromArgb(54, 68, 91);
+            panel.Radius = 8;
             panel.Padding = new Padding(12);
 
-            CheckBox checkbox = new CheckBox();
+            ModernCheckBox checkbox = new ModernCheckBox();
             checkbox.AutoSize = false;
             checkbox.Checked = isChecked;
-            checkbox.FlatStyle = FlatStyle.Flat;
-            checkbox.ForeColor = TextColor;
+            checkbox.CheckedColor = AccentColor;
+            checkbox.BorderColor = BorderColor;
+            checkbox.SurfaceColor = FieldColor;
+            checkbox.TickColor = Color.FromArgb(8, 25, 17);
             checkbox.Location = new Point(14, 18);
             checkbox.Size = new Size(28, 28);
             checkbox.Text = string.Empty;
             checkbox.UseVisualStyleBackColor = false;
             panel.Controls.Add(checkbox);
 
-            Label titleLabel = CreateFloatingLabel(title, 10.2F, FontStyle.Bold, TextColor, 52, 12, 370, 24);
+            Label titleLabel = CreateFloatingLabel(title, 10.2F, FontStyle.Bold, TextColor, 52, 12, 430, 24);
             panel.Controls.Add(titleLabel);
 
-            Label descriptionLabel = CreateFloatingLabel(description, 8.7F, FontStyle.Regular, MutedTextColor, 52, 38, 378, 24);
+            Label descriptionLabel = CreateFloatingLabel(description, 8.7F, FontStyle.Regular, MutedTextColor, 52, 38, 432, 24);
             panel.Controls.Add(descriptionLabel);
 
-            panel.Click += delegate
+            EventHandler updateCard = delegate
             {
-                checkbox.Checked = !checkbox.Checked;
+                panel.FillColor = checkbox.Checked ? SelectedSurfaceColor : SurfaceAltColor;
+                panel.BorderColor = checkbox.Checked ? AccentColor : Color.FromArgb(54, 68, 91);
+                checkbox.BackColor = panel.FillColor;
+                checkbox.SurfaceColor = checkbox.Checked ? Color.FromArgb(16, 72, 48) : FieldColor;
+                panel.Invalidate();
+                checkbox.Invalidate();
+                if (reviewSummaryLabel != null)
+                {
+                    UpdateReviewSummary();
+                }
             };
-            titleLabel.Click += delegate
-            {
-                checkbox.Checked = !checkbox.Checked;
-            };
-            descriptionLabel.Click += delegate
-            {
-                checkbox.Checked = !checkbox.Checked;
-            };
+            checkbox.CheckedChanged += updateCard;
+            updateCard(checkbox, EventArgs.Empty);
+
+            panel.Click += delegate { checkbox.Checked = !checkbox.Checked; };
+            titleLabel.Click += delegate { checkbox.Checked = !checkbox.Checked; };
+            descriptionLabel.Click += delegate { checkbox.Checked = !checkbox.Checked; };
 
             return checkbox;
+        }
+
+        private FlowLayoutPanel CreateWizardNav()
+        {
+            FlowLayoutPanel nav = new FlowLayoutPanel();
+            nav.Dock = DockStyle.Fill;
+            nav.FlowDirection = FlowDirection.RightToLeft;
+            nav.WrapContents = false;
+            nav.BackColor = SurfaceColor;
+            nav.Padding = new Padding(22, 8, 22, 10);
+
+            nextButton = CreatePrimaryButton("Next");
+            nextButton.Width = 118;
+            nextButton.Click += delegate
+            {
+                if (currentStep < StepCount - 1)
+                {
+                    currentStep++;
+                    UpdateWizard();
+                }
+            };
+            nav.Controls.Add(nextButton);
+
+            backButton = CreateSecondaryButton("Back");
+            backButton.Width = 118;
+            backButton.Click += delegate
+            {
+                if (currentStep > 0)
+                {
+                    currentStep--;
+                    UpdateWizard();
+                }
+            };
+            nav.Controls.Add(backButton);
+
+            return nav;
+        }
+
+        private static Control CreateStatusBadge(string text)
+        {
+            Label badge = new Label();
+            badge.AutoSize = false;
+            badge.Text = text;
+            badge.TextAlign = ContentAlignment.MiddleCenter;
+            badge.Font = CreateFont(8.5F, FontStyle.Bold);
+            badge.ForeColor = Color.FromArgb(206, 232, 221);
+            badge.BackColor = Color.FromArgb(28, 63, 55);
+            badge.Width = Math.Max(92, text.Length * 8 + 28);
+            badge.Height = 28;
+            badge.Margin = new Padding(0, 0, 8, 0);
+            return badge;
         }
 
         private static Label CreateLabel(string text, float size, FontStyle style, Color color)
@@ -678,12 +1042,109 @@ namespace MbsTerminalSetup
                 if (dialog.ShowDialog(this) == DialogResult.OK)
                 {
                     target.Text = dialog.SelectedPath;
+                    UpdateReviewSummary();
                 }
             }
         }
 
+        private void UpdateWizard()
+        {
+            if (currentStep < 0)
+            {
+                currentStep = 0;
+            }
+
+            if (currentStep >= StepCount)
+            {
+                currentStep = StepCount - 1;
+            }
+
+            wizardTitleLabel.Text = wizardTitles[currentStep];
+            wizardDescriptionLabel.Text = wizardDescriptions[currentStep];
+
+            for (int index = 0; index < wizardPages.Count; index++)
+            {
+                wizardPages[index].Visible = index == currentStep;
+            }
+
+            for (int index = 0; index < StepCount; index++)
+            {
+                bool isActive = index == currentStep;
+                bool isComplete = index < currentStep;
+                stepLabels[index].BackColor = isActive ? AccentColor : isComplete ? Color.FromArgb(28, 63, 55) : SurfaceAltColor;
+                stepLabels[index].ForeColor = isActive ? Color.FromArgb(4, 15, 13) : TextColor;
+            }
+
+            backButton.Enabled = currentStep > 0 && !IsInstalling();
+            nextButton.Visible = currentStep < StepCount - 1;
+            nextButton.Enabled = !IsInstalling();
+            installButton.Visible = currentStep == StepCount - 1 || IsInstalling();
+            installButton.Enabled = currentStep == StepCount - 1 && !IsInstalling();
+
+            if (currentStep == StepCount - 1)
+            {
+                UpdateReviewSummary();
+                statusLabel.Text = "Ready to install";
+            }
+            else
+            {
+                statusLabel.Text = "Step " + (currentStep + 1) + " of " + StepCount + ": " + stepTitles[currentStep];
+            }
+        }
+
+        private bool IsInstalling()
+        {
+            return installerProcess != null && !installerProcess.HasExited;
+        }
+
+        private void UpdateReviewSummary()
+        {
+            if (reviewSummaryLabel == null)
+            {
+                return;
+            }
+
+            StringBuilder summary = new StringBuilder();
+            summary.AppendLine("Terminal profile");
+            summary.AppendLine("  Starting directory: " + CleanValue(startingDirectoryBox.Text, "User profile"));
+            summary.AppendLine("  Starship install:   " + YesNo(installStarshipBox.Checked));
+            summary.AppendLine();
+            summary.AppendLine("Runtime");
+            summary.AppendLine("  Install PHP 8.4:    " + YesNo(installPhpBox.Checked));
+            summary.AppendLine("  Existing PHP path:  " + CleanValue(phpDirectoryBox.Text, "Not selected"));
+            summary.AppendLine("  Composer:           " + YesNo(installComposerBox.Checked));
+            summary.AppendLine();
+            summary.AppendLine("Laravel tooling");
+            summary.AppendLine("  Update installed:   " + YesNo(updateToolsBox.Checked));
+            summary.AppendLine("  Laravel Installer:  " + YesNo(installLaravelBox.Checked));
+            summary.AppendLine("  Valet for Windows:  " + YesNo(installValetBox.Checked));
+            reviewSummaryLabel.Text = summary.ToString();
+        }
+
+        private static string CleanValue(string value, string fallback)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return fallback;
+            }
+
+            return value.Trim();
+        }
+
+        private static string YesNo(bool value)
+        {
+            return value ? "Yes" : "No";
+        }
+
         private void InstallButtonClick(object sender, EventArgs e)
         {
+            if (currentStep != StepCount - 1)
+            {
+                currentStep = StepCount - 1;
+                UpdateWizard();
+                return;
+            }
+
             StartInstall();
         }
 
@@ -710,7 +1171,7 @@ namespace MbsTerminalSetup
 
         private void StartInstall()
         {
-            if (installerProcess != null && !installerProcess.HasExited)
+            if (IsInstalling())
             {
                 return;
             }
@@ -731,6 +1192,7 @@ namespace MbsTerminalSetup
                 startingDirectoryBox.Text = startingDirectory;
             }
 
+            SetWizardEnabled(false);
             installButton.Enabled = false;
             cancelButton.Enabled = true;
             closeButton.Enabled = false;
@@ -781,10 +1243,22 @@ namespace MbsTerminalSetup
             }
         }
 
+        private void SetWizardEnabled(bool enabled)
+        {
+            backButton.Enabled = enabled && currentStep > 0;
+            nextButton.Enabled = enabled && currentStep < StepCount - 1;
+
+            for (int index = 0; index < stepLabels.Length; index++)
+            {
+                stepLabels[index].Enabled = enabled;
+            }
+        }
+
         private void AppendSelectedOptions()
         {
             AppendLog("Selected setup:", MutedTextColor);
             AppendLog("  Terminal profile: yes", MutedTextColor);
+            AppendLog("  Starting directory: " + CleanValue(startingDirectoryBox.Text, "User profile"), MutedTextColor);
 
             if (installPhpBox.Checked)
             {
@@ -799,6 +1273,11 @@ namespace MbsTerminalSetup
             if (installComposerBox.Checked)
             {
                 AppendLog("  Composer: install or verify", MutedTextColor);
+            }
+
+            if (updateToolsBox.Checked)
+            {
+                AppendLog("  Update existing tooling: yes", MutedTextColor);
             }
 
             if (installLaravelBox.Checked)
@@ -864,6 +1343,11 @@ namespace MbsTerminalSetup
             if (installComposerBox.Checked)
             {
                 arguments.Add("-InstallComposer");
+            }
+
+            if (updateToolsBox.Checked)
+            {
+                arguments.Add("-UpdateTools");
             }
 
             if (installLaravelBox.Checked)
@@ -938,7 +1422,7 @@ namespace MbsTerminalSetup
             progressBar.Style = ProgressBarStyle.Blocks;
             progressBar.MarqueeAnimationSpeed = 0;
             progressBar.Value = exitCode == 0 ? 100 : 0;
-            installButton.Enabled = true;
+            SetWizardEnabled(true);
             cancelButton.Enabled = false;
             closeButton.Enabled = true;
 
@@ -958,6 +1442,8 @@ namespace MbsTerminalSetup
                 installerProcess.Dispose();
                 installerProcess = null;
             }
+
+            UpdateWizard();
         }
 
         private void AppendLog(string message, Color color)
@@ -1010,6 +1496,107 @@ namespace MbsTerminalSetup
         }
     }
 
+    internal class RoundedPanel : Panel
+    {
+        public RoundedPanel()
+        {
+            DoubleBuffered = true;
+            FillColor = BackColor;
+            BorderColor = Color.Transparent;
+            Radius = 8;
+        }
+
+        public Color FillColor { get; set; }
+        public Color BorderColor { get; set; }
+        public int Radius { get; set; }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+            using (GraphicsPath path = CreateRoundRectangle(new Rectangle(0, 0, Width - 1, Height - 1), Radius))
+            using (SolidBrush brush = new SolidBrush(FillColor))
+            using (Pen pen = new Pen(BorderColor, 1F))
+            {
+                e.Graphics.FillPath(brush, path);
+                e.Graphics.DrawPath(pen, path);
+            }
+        }
+
+        private static GraphicsPath CreateRoundRectangle(Rectangle bounds, int radius)
+        {
+            int diameter = Math.Max(1, radius * 2);
+            GraphicsPath path = new GraphicsPath();
+            path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+    }
+
+    internal sealed class ModernCheckBox : CheckBox
+    {
+        public ModernCheckBox()
+        {
+            DoubleBuffered = true;
+            CheckedColor = Color.FromArgb(34, 197, 94);
+            BorderColor = Color.FromArgb(71, 85, 105);
+            SurfaceColor = Color.FromArgb(12, 19, 34);
+            TickColor = Color.FromArgb(8, 25, 17);
+            Cursor = Cursors.Hand;
+        }
+
+        public Color CheckedColor { get; set; }
+        public Color BorderColor { get; set; }
+        public Color SurfaceColor { get; set; }
+        public Color TickColor { get; set; }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            e.Graphics.Clear(BackColor);
+
+            Rectangle box = new Rectangle(3, 3, 22, 22);
+
+            using (GraphicsPath path = CreateRoundRectangle(box, 5))
+            using (SolidBrush brush = new SolidBrush(Checked ? CheckedColor : SurfaceColor))
+            using (Pen pen = new Pen(Checked ? CheckedColor : BorderColor, 1.5F))
+            {
+                e.Graphics.FillPath(brush, path);
+                e.Graphics.DrawPath(pen, path);
+            }
+
+            if (Checked)
+            {
+                using (Pen tick = new Pen(TickColor, 2.2F))
+                {
+                    tick.StartCap = LineCap.Round;
+                    tick.EndCap = LineCap.Round;
+                    e.Graphics.DrawLines(tick, new[]
+                    {
+                        new Point(8, 15),
+                        new Point(13, 20),
+                        new Point(21, 9)
+                    });
+                }
+            }
+        }
+
+        private static GraphicsPath CreateRoundRectangle(Rectangle bounds, int radius)
+        {
+            int diameter = Math.Max(1, radius * 2);
+            GraphicsPath path = new GraphicsPath();
+            path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+    }
+
     internal sealed class HeaderPanel : Panel
     {
         public HeaderPanel()
@@ -1031,7 +1618,7 @@ namespace MbsTerminalSetup
                 e.Graphics.FillRectangle(brush, ClientRectangle);
             }
 
-            using (SolidBrush overlay = new SolidBrush(Color.FromArgb(50, 46, 204, 160)))
+            using (SolidBrush overlay = new SolidBrush(Color.FromArgb(50, 34, 197, 94)))
             {
                 e.Graphics.FillEllipse(overlay, Width - 250, -120, 380, 280);
             }

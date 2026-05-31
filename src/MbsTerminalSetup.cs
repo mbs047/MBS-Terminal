@@ -15,6 +15,11 @@ namespace MbsTerminalSetup
         [STAThread]
         private static int Main(string[] args)
         {
+            if (!IsAdministrator())
+            {
+                return RelaunchAsAdministrator(args);
+            }
+
             InstallerOptions options = InstallerOptions.FromArgs(args);
 
             Application.EnableVisualStyles();
@@ -24,6 +29,80 @@ namespace MbsTerminalSetup
             Application.Run(form);
 
             return form.ExitCode;
+        }
+
+        private static bool IsAdministrator()
+        {
+            System.Security.Principal.WindowsIdentity identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+            System.Security.Principal.WindowsPrincipal principal = new System.Security.Principal.WindowsPrincipal(identity);
+            return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+        }
+
+        private static int RelaunchAsAdministrator(string[] args)
+        {
+            try
+            {
+                ProcessStartInfo startInfo = new ProcessStartInfo();
+                startInfo.FileName = Application.ExecutablePath;
+                startInfo.Arguments = BuildArgumentString(args);
+                startInfo.WorkingDirectory = Environment.CurrentDirectory;
+                startInfo.UseShellExecute = true;
+                startInfo.Verb = "runas";
+                Process.Start(startInfo);
+                return 0;
+            }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
+                MessageBox.Show(
+                    "Administrator permission is required to run MBS Terminal Setup.",
+                    "MBS Terminal Setup",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+                return ex.NativeErrorCode == 1223 ? 1 : ex.NativeErrorCode;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Could not restart as administrator: " + ex.Message,
+                    "MBS Terminal Setup",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+                return 1;
+            }
+        }
+
+        private static string BuildArgumentString(string[] args)
+        {
+            if (args == null || args.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            List<string> quotedArguments = new List<string>();
+
+            foreach (string argument in args)
+            {
+                quotedArguments.Add(QuoteArgument(argument));
+            }
+
+            return string.Join(" ", quotedArguments.ToArray());
+        }
+
+        private static string QuoteArgument(string argument)
+        {
+            if (argument == null)
+            {
+                return "\"\"";
+            }
+
+            if (argument.Length == 0 || argument.IndexOfAny(new[] { ' ', '\t', '"' }) >= 0)
+            {
+                return "\"" + argument.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+            }
+
+            return argument;
         }
     }
 
@@ -147,6 +226,22 @@ namespace MbsTerminalSetup
         private readonly string iconPath;
         private readonly List<Control> wizardPages = new List<Control>();
         private readonly Label[] stepLabels = new Label[StepCount];
+        private static readonly string[] TerminalProcessNames =
+        {
+            "WindowsTerminal",
+            "wt",
+            "OpenConsole",
+            "powershell",
+            "pwsh",
+            "cmd",
+            "ConEmu",
+            "ConEmu64",
+            "Cmder",
+            "Tabby",
+            "alacritty",
+            "wezterm-gui",
+            "mintty"
+        };
         private readonly string[] stepTitles =
         {
             "Terms",
@@ -1520,6 +1615,7 @@ namespace MbsTerminalSetup
             statusLabel.Text = "Installing...";
             AppendLog("Starting installation.", AccentColor);
             AppendSelectedOptions();
+            CloseTerminalWindowsBeforeInstall();
 
             ProcessStartInfo startInfo = new ProcessStartInfo();
             startInfo.FileName = GetPowerShellPath();
@@ -1571,6 +1667,87 @@ namespace MbsTerminalSetup
             {
                 stepLabels[index].Enabled = enabled;
             }
+        }
+
+        private void CloseTerminalWindowsBeforeInstall()
+        {
+            AppendLog("Closing open terminal windows before installation.", MutedTextColor);
+
+            int currentProcessId = Process.GetCurrentProcess().Id;
+            HashSet<int> seenProcessIds = new HashSet<int>();
+            List<Process> terminalProcesses = new List<Process>();
+
+            foreach (string processName in TerminalProcessNames)
+            {
+                Process[] processes;
+
+                try
+                {
+                    processes = Process.GetProcessesByName(processName);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                foreach (Process process in processes)
+                {
+                    if (process.Id == currentProcessId || seenProcessIds.Contains(process.Id))
+                    {
+                        process.Dispose();
+                        continue;
+                    }
+
+                    if (process.MainWindowHandle == IntPtr.Zero)
+                    {
+                        process.Dispose();
+                        continue;
+                    }
+
+                    seenProcessIds.Add(process.Id);
+                    terminalProcesses.Add(process);
+                }
+            }
+
+            if (terminalProcesses.Count == 0)
+            {
+                AppendLog("No open terminal windows were detected.", MutedTextColor);
+                return;
+            }
+
+            int closedCount = 0;
+            int forcedCount = 0;
+
+            foreach (Process process in terminalProcesses)
+            {
+                try
+                {
+                    AppendLog("Closing terminal: " + process.ProcessName + " (" + process.Id + ")", MutedTextColor);
+                    process.CloseMainWindow();
+                    closedCount++;
+
+                    if (!process.WaitForExit(2500) && !process.HasExited)
+                    {
+                        process.Kill();
+                        forcedCount++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AppendLog("Could not close " + process.ProcessName + ": " + ex.Message, WarningColor);
+                }
+                finally
+                {
+                    process.Dispose();
+                }
+            }
+
+            AppendLog(
+                forcedCount > 0
+                    ? "Closed " + closedCount + " terminal window(s); forced " + forcedCount + " to exit."
+                    : "Closed " + closedCount + " terminal window(s).",
+                MutedTextColor
+            );
         }
 
         private void AppendSelectedOptions()

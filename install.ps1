@@ -57,6 +57,10 @@ function Test-IsAdministrator {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+if (-not (Test-IsAdministrator)) {
+    throw 'MBS Terminal installer must be run as administrator.'
+}
+
 function Get-EnvironmentTarget {
     if ($InstallScope -eq 'AllUsers') {
         return 'Machine'

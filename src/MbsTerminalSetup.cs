@@ -127,18 +127,18 @@ namespace MbsTerminalSetup
         private const int WizardContentWidth = 520;
         private const int StepCount = 5;
 
-        private static readonly Color BackgroundColor = Color.FromArgb(224, 238, 248);
-        private static readonly Color HeaderStartColor = Color.FromArgb(255, 255, 255);
-        private static readonly Color HeaderEndColor = Color.FromArgb(239, 246, 255);
-        private static readonly Color SurfaceColor = Color.FromArgb(255, 255, 255);
-        private static readonly Color SurfaceAltColor = Color.FromArgb(246, 248, 252);
-        private static readonly Color SelectedSurfaceColor = Color.FromArgb(247, 242, 255);
-        private static readonly Color FieldColor = Color.FromArgb(255, 255, 255);
-        private static readonly Color BorderColor = Color.FromArgb(213, 221, 234);
-        private static readonly Color TextColor = Color.FromArgb(15, 23, 42);
-        private static readonly Color MutedTextColor = Color.FromArgb(93, 106, 130);
-        private static readonly Color AccentColor = Color.FromArgb(111, 42, 179);
-        private static readonly Color AccentAltColor = Color.FromArgb(14, 165, 233);
+        private static readonly Color BackgroundColor = Color.FromArgb(4, 4, 7);
+        private static readonly Color HeaderStartColor = Color.FromArgb(3, 3, 6);
+        private static readonly Color HeaderEndColor = Color.FromArgb(21, 13, 32);
+        private static readonly Color SurfaceColor = Color.FromArgb(10, 10, 15);
+        private static readonly Color SurfaceAltColor = Color.FromArgb(20, 20, 29);
+        private static readonly Color SelectedSurfaceColor = Color.FromArgb(31, 20, 45);
+        private static readonly Color FieldColor = Color.FromArgb(7, 7, 11);
+        private static readonly Color BorderColor = Color.FromArgb(58, 60, 74);
+        private static readonly Color TextColor = Color.FromArgb(248, 250, 252);
+        private static readonly Color MutedTextColor = Color.FromArgb(154, 164, 178);
+        private static readonly Color AccentColor = Color.FromArgb(168, 85, 247);
+        private static readonly Color AccentAltColor = Color.FromArgb(34, 211, 238);
         private static readonly Color WarningColor = Color.FromArgb(245, 158, 11);
         private static readonly Color DangerColor = Color.FromArgb(239, 68, 68);
 
@@ -217,8 +217,8 @@ namespace MbsTerminalSetup
             ExitCode = 0;
             Text = "MBS Terminal Setup";
             StartPosition = FormStartPosition.CenterScreen;
-            MinimumSize = new Size(1100, 760);
-            Size = new Size(1180, 820);
+            MinimumSize = new Size(960, 640);
+            Size = new Size(1100, 720);
             BackColor = BackgroundColor;
             ForeColor = TextColor;
             Font = CreateFont(9F, FontStyle.Regular);
@@ -261,7 +261,7 @@ namespace MbsTerminalSetup
             RoundedPanel wizardHost = new RoundedPanel();
             wizardHost.Dock = DockStyle.Fill;
             wizardHost.Margin = new Padding(22, 10, 22, 12);
-            wizardHost.FillColor = Color.FromArgb(250, 252, 255);
+            wizardHost.FillColor = Color.FromArgb(9, 10, 15);
             wizardHost.BorderColor = BorderColor;
             wizardHost.Radius = 8;
             wizardHost.Padding = new Padding(1);
@@ -349,7 +349,7 @@ namespace MbsTerminalSetup
             runLayout.Controls.Add(guidePanel, 0, 6);
 
             logBox = new RichTextBox();
-            logBox.BackColor = Color.FromArgb(248, 250, 252);
+            logBox.BackColor = Color.FromArgb(7, 8, 12);
             logBox.BorderStyle = BorderStyle.FixedSingle;
             logBox.Dock = DockStyle.Fill;
             logBox.ForeColor = TextColor;
@@ -381,6 +381,7 @@ namespace MbsTerminalSetup
             AppendLog("Tip: if you already use Laragon, XAMPP, or a custom PHP build, select its PHP folder instead of installing PHP.", MutedTextColor);
 
             UpdateWizard();
+            FitWindowToFirstScreen();
 
             Shown += delegate
             {
@@ -394,6 +395,42 @@ namespace MbsTerminalSetup
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool DestroyIcon(IntPtr handle);
+
+        private void FitWindowToFirstScreen()
+        {
+            if (wizardPages.Count == 0)
+            {
+                return;
+            }
+
+            Size contentSize = MeasureChildBounds(wizardPages[0]);
+
+            int wizardChromeWidth = 18 + 18 + 10 + 10 + 22 + 22 + 2;
+            int wizardChromeHeight = 136 + 18 + 18 + 10 + 10 + 76 + 72 + 62 + 10 + 12 + 2;
+            int desiredClientWidth = Math.Max(960, contentSize.Width + wizardChromeWidth);
+            int desiredClientHeight = Math.Max(640, contentSize.Height + wizardChromeHeight);
+
+            Rectangle workingArea = Screen.FromControl(this).WorkingArea;
+            desiredClientWidth = Math.Min(desiredClientWidth, Math.Max(900, workingArea.Width - 80));
+            desiredClientHeight = Math.Min(desiredClientHeight, Math.Max(600, workingArea.Height - 80));
+
+            ClientSize = new Size(desiredClientWidth, desiredClientHeight);
+            MinimumSize = SizeFromClientSize(new Size(desiredClientWidth, desiredClientHeight));
+        }
+
+        private static Size MeasureChildBounds(Control parent)
+        {
+            int right = 0;
+            int bottom = 0;
+
+            foreach (Control child in parent.Controls)
+            {
+                right = Math.Max(right, child.Bounds.Right);
+                bottom = Math.Max(bottom, child.Bounds.Bottom);
+            }
+
+            return new Size(right + 22, bottom + 22);
+        }
 
         private static string GetRepositoryRoot()
         {
@@ -527,8 +564,8 @@ namespace MbsTerminalSetup
             pill.Text = text;
             pill.TextAlign = ContentAlignment.MiddleCenter;
             pill.Font = CreateFont(8.5F, FontStyle.Bold);
-            pill.BackColor = Color.FromArgb(42, color);
-            pill.ForeColor = TextColor;
+            pill.BackColor = Color.FromArgb(55, color);
+            pill.ForeColor = Color.FromArgb(245, 247, 255);
             pill.Location = new Point(left, top);
             pill.Size = new Size(Math.Max(62, text.Length * 9 + 26), 30);
             parent.Controls.Add(pill);
@@ -554,7 +591,7 @@ namespace MbsTerminalSetup
             panel.Dock = DockStyle.Fill;
             panel.BackColor = BackgroundColor;
             panel.FillColor = SurfaceColor;
-            panel.BorderColor = Color.FromArgb(57, 72, 96);
+            panel.BorderColor = Color.FromArgb(35, 37, 49);
             panel.Radius = 8;
             panel.Margin = new Padding(10);
             panel.Padding = new Padding(1);
@@ -637,7 +674,7 @@ namespace MbsTerminalSetup
             RoundedPanel panel = new RoundedPanel();
             panel.Dock = DockStyle.Fill;
             panel.FillColor = FieldColor;
-            panel.BorderColor = Color.FromArgb(54, 68, 91);
+            panel.BorderColor = BorderColor;
             panel.Radius = 8;
             panel.BackColor = SurfaceColor;
             panel.Margin = new Padding(0);
@@ -736,10 +773,10 @@ namespace MbsTerminalSetup
             reviewCard.Width = WizardContentWidth;
             reviewCard.Height = 300;
             reviewCard.Margin = new Padding(0, 0, 0, 12);
-            reviewCard.FillColor = Color.FromArgb(255, 255, 255);
+            reviewCard.FillColor = Color.FromArgb(13, 14, 20);
             reviewCard.BorderColor = BorderColor;
             reviewCard.Radius = 8;
-            reviewCard.BackColor = Color.FromArgb(250, 252, 255);
+            reviewCard.BackColor = Color.FromArgb(9, 10, 15);
 
             reviewSummaryLabel = CreateFloatingLabel(string.Empty, 9.1F, FontStyle.Regular, TextColor, 18, 14, 480, 270);
             reviewSummaryLabel.Font = CreateMonoFont(8.9F);
@@ -764,7 +801,7 @@ namespace MbsTerminalSetup
             page.FlowDirection = FlowDirection.TopDown;
             page.WrapContents = false;
             page.AutoScroll = false;
-            page.BackColor = Color.FromArgb(250, 252, 255);
+            page.BackColor = Color.FromArgb(9, 10, 15);
             page.Padding = new Padding(22, 22, 22, 18);
             return page;
         }
@@ -772,7 +809,7 @@ namespace MbsTerminalSetup
         private static Panel CreateWideWizardPage()
         {
             Panel page = new Panel();
-            page.BackColor = Color.FromArgb(250, 252, 255);
+            page.BackColor = Color.FromArgb(9, 10, 15);
             page.AutoScroll = false;
             return page;
         }
@@ -790,10 +827,10 @@ namespace MbsTerminalSetup
             card.Width = WizardContentWidth;
             card.Height = 88;
             card.Margin = new Padding(0, 0, 0, 12);
-            card.FillColor = Color.FromArgb(255, 255, 255);
+            card.FillColor = Color.FromArgb(13, 14, 20);
             card.BorderColor = BorderColor;
             card.Radius = 8;
-            card.BackColor = Color.FromArgb(250, 252, 255);
+            card.BackColor = Color.FromArgb(9, 10, 15);
 
             Panel accent = new Panel();
             accent.BackColor = AccentColor;
@@ -812,11 +849,11 @@ namespace MbsTerminalSetup
             card.Width = WizardContentWidth;
             card.Height = 66;
             card.Margin = new Padding(0, 0, 0, 12);
-            card.FillColor = Color.FromArgb(239, 246, 255);
-            card.BorderColor = Color.FromArgb(191, 219, 254);
+            card.FillColor = Color.FromArgb(7, 25, 34);
+            card.BorderColor = Color.FromArgb(21, 94, 117);
             card.Radius = 8;
-            card.BackColor = Color.FromArgb(250, 252, 255);
-            card.Controls.Add(CreateFloatingLabel(text, 9.2F, FontStyle.Regular, Color.FromArgb(30, 64, 120), 18, 12, 480, 40));
+            card.BackColor = Color.FromArgb(9, 10, 15);
+            card.Controls.Add(CreateFloatingLabel(text, 9.2F, FontStyle.Regular, Color.FromArgb(186, 230, 253), 18, 12, 480, 40));
             return card;
         }
 
@@ -826,13 +863,13 @@ namespace MbsTerminalSetup
             card.Width = WizardContentWidth;
             card.Height = 82;
             card.Margin = new Padding(0, 0, 0, 12);
-            card.FillColor = Color.FromArgb(255, 251, 235);
+            card.FillColor = Color.FromArgb(42, 29, 11);
             card.BorderColor = Color.FromArgb(245, 158, 11);
             card.Radius = 8;
-            card.BackColor = Color.FromArgb(250, 252, 255);
+            card.BackColor = Color.FromArgb(9, 10, 15);
 
-            card.Controls.Add(CreateFloatingLabel("Detected installed tooling", 10.2F, FontStyle.Bold, Color.FromArgb(146, 64, 14), 18, 10, 460, 24));
-            card.Controls.Add(CreateFloatingLabel(BuildDetectedToolsMessage(), 8.8F, FontStyle.Regular, Color.FromArgb(120, 53, 15), 18, 36, 478, 40));
+            card.Controls.Add(CreateFloatingLabel("Detected installed tooling", 10.2F, FontStyle.Bold, Color.FromArgb(252, 211, 77), 18, 10, 460, 24));
+            card.Controls.Add(CreateFloatingLabel(BuildDetectedToolsMessage(), 8.8F, FontStyle.Regular, Color.FromArgb(253, 230, 138), 18, 36, 478, 40));
             return card;
         }
 
@@ -916,7 +953,7 @@ namespace MbsTerminalSetup
             panel.Width = WizardContentWidth;
             panel.Height = 78;
             panel.Margin = new Padding(0, 0, 0, 12);
-            panel.BackColor = Color.FromArgb(250, 252, 255);
+            panel.BackColor = Color.FromArgb(9, 10, 15);
 
             Label label = CreateFloatingLabel(title, 8.8F, FontStyle.Bold, TextColor, 0, 0, 460, 22);
             panel.Controls.Add(label);
@@ -955,7 +992,7 @@ namespace MbsTerminalSetup
             panel.Width = WizardContentWidth;
             panel.Height = 70;
             panel.Margin = new Padding(0, 0, 0, 10);
-            panel.BackColor = Color.FromArgb(250, 252, 255);
+            panel.BackColor = Color.FromArgb(9, 10, 15);
             panel.FillColor = SurfaceAltColor;
             panel.BorderColor = BorderColor;
             panel.Radius = 8;
@@ -1098,8 +1135,8 @@ namespace MbsTerminalSetup
             button.BackColor = SurfaceAltColor;
             button.ForeColor = TextColor;
             button.FlatAppearance.BorderColor = BorderColor;
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(237, 242, 247);
-            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(226, 232, 240);
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(29, 30, 40);
+            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(18, 19, 27);
             return button;
         }
 
@@ -1109,8 +1146,8 @@ namespace MbsTerminalSetup
             button.BackColor = SurfaceColor;
             button.ForeColor = MutedTextColor;
             button.FlatAppearance.BorderColor = BorderColor;
-            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(248, 250, 252);
-            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(241, 245, 249);
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(18, 19, 27);
+            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(12, 13, 19);
             return button;
         }
 
@@ -1216,7 +1253,7 @@ namespace MbsTerminalSetup
             {
                 bool isActive = index == currentStep;
                 bool isComplete = index < currentStep;
-                stepLabels[index].BackColor = isActive ? AccentColor : isComplete ? Color.FromArgb(224, 242, 254) : SurfaceAltColor;
+                stepLabels[index].BackColor = isActive ? AccentColor : isComplete ? Color.FromArgb(16, 43, 52) : SurfaceAltColor;
                 stepLabels[index].ForeColor = isActive ? Color.White : TextColor;
             }
 
@@ -1752,7 +1789,7 @@ namespace MbsTerminalSetup
         {
             DoubleBuffered = true;
             CheckedColor = Color.FromArgb(34, 197, 94);
-            BorderColor = Color.FromArgb(71, 85, 105);
+            BorderColor = Color.FromArgb(58, 60, 74);
             SurfaceColor = Color.FromArgb(12, 19, 34);
             TickColor = Color.FromArgb(8, 25, 17);
             Cursor = Cursors.Hand;
@@ -1812,7 +1849,7 @@ namespace MbsTerminalSetup
         public AnimatedAccentPanel()
         {
             DoubleBuffered = true;
-            BackColor = Color.White;
+            BackColor = Color.FromArgb(10, 10, 15);
             StatusText = "Now installing...";
         }
 
@@ -1826,8 +1863,8 @@ namespace MbsTerminalSetup
 
             Rectangle bounds = new Rectangle(0, 0, Width - 1, Height - 1);
             using (GraphicsPath cardPath = CreateRoundRectangle(bounds, 8))
-            using (LinearGradientBrush cardBrush = new LinearGradientBrush(bounds, Color.White, Color.FromArgb(250, 245, 255), LinearGradientMode.Horizontal))
-            using (Pen border = new Pen(Color.FromArgb(216, 223, 236), 1F))
+            using (LinearGradientBrush cardBrush = new LinearGradientBrush(bounds, Color.FromArgb(8, 8, 12), Color.FromArgb(16, 10, 26), LinearGradientMode.Horizontal))
+            using (Pen border = new Pen(Color.FromArgb(58, 60, 74), 1F))
             {
                 e.Graphics.FillPath(cardBrush, cardPath);
                 e.Graphics.DrawPath(border, cardPath);
@@ -1858,8 +1895,8 @@ namespace MbsTerminalSetup
 
             using (Font titleFont = new Font(Font.FontFamily, 20F, FontStyle.Bold))
             using (Font bodyFont = new Font(Font.FontFamily, 10.5F, FontStyle.Regular))
-            using (SolidBrush titleBrush = new SolidBrush(Color.FromArgb(15, 23, 42)))
-            using (SolidBrush bodyBrush = new SolidBrush(Color.FromArgb(71, 85, 105)))
+            using (SolidBrush titleBrush = new SolidBrush(Color.FromArgb(248, 250, 252)))
+            using (SolidBrush bodyBrush = new SolidBrush(Color.FromArgb(203, 213, 225)))
             {
                 e.Graphics.DrawString("Optimizing your", titleFont, titleBrush, 36, 44);
                 e.Graphics.DrawString("developer setup.", titleFont, titleBrush, 36, 74);
@@ -1868,7 +1905,7 @@ namespace MbsTerminalSetup
 
             Rectangle track = new Rectangle(Math.Max(Width - 390, 520), Height / 2 - 12, 280, 16);
             using (GraphicsPath trackPath = CreateRoundRectangle(track, 3))
-            using (SolidBrush trackBrush = new SolidBrush(Color.FromArgb(244, 244, 248)))
+            using (SolidBrush trackBrush = new SolidBrush(Color.FromArgb(36, 37, 48)))
             {
                 e.Graphics.FillPath(trackBrush, trackPath);
             }
@@ -1951,7 +1988,7 @@ namespace MbsTerminalSetup
                 e.Graphics.FillEllipse(cyan, Width - 370, 56, 220, 130);
             }
 
-            using (Pen line = new Pen(Color.FromArgb(220, 213, 221, 234), 1F))
+            using (Pen line = new Pen(Color.FromArgb(80, 58, 60, 74), 1F))
             {
                 e.Graphics.DrawLine(line, 0, Height - 1, Width, Height - 1);
             }

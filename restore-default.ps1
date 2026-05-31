@@ -156,7 +156,7 @@ function Restore-PowerShellProfile {
 
     $content = [regex]::Replace(
         $content,
-        "(?m)^\s*if\s*\(\s*Test-Path\s+-LiteralPath\s+[""']\$HOME\\\.config\\powershell\\laravel-dev\.ps1[""']\s*\)\s*\{\s*\r?\n\s*\.\s+[""']\$HOME\\\.config\\powershell\\laravel-dev\.ps1[""']\s*\r?\n\s*\}\s*\r?\n?",
+        '(?m)^\s*if\s*\(\s*Test-Path\s+-LiteralPath\s+["'']\$HOME\\\.config\\powershell\\laravel-dev\.ps1["'']\s*\)\s*\{\s*\r?\n\s*\.\s+["'']\$HOME\\\.config\\powershell\\laravel-dev\.ps1["'']\s*\r?\n\s*\}\s*\r?\n?',
         ''
     )
 

@@ -711,28 +711,29 @@ namespace MbsTerminalSetup
             title.MouseDown += TitleBarMouseDown;
             header.Controls.Add(title);
 
-            Label minimizeButton = CreateWindowButton("_", 0, 0);
-            minimizeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            minimizeButton.Location = new Point(header.Width - 132, 0);
-            minimizeButton.Click += delegate { WindowState = FormWindowState.Minimized; };
-            header.Controls.Add(minimizeButton);
+            Panel windowActions = new Panel();
+            windowActions.Dock = DockStyle.Right;
+            windowActions.Width = 132;
+            windowActions.BackColor = Color.FromArgb(12, 13, 19);
+            header.Controls.Add(windowActions);
+            windowActions.BringToFront();
 
-            Label maximizeButton = CreateWindowButton("□", 0, 0);
-            maximizeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            maximizeButton.Location = new Point(header.Width - 88, 0);
+            Label minimizeButton = CreateWindowButton("_", 0, 0);
+            minimizeButton.Click += delegate { WindowState = FormWindowState.Minimized; };
+            windowActions.Controls.Add(minimizeButton);
+
+            Label maximizeButton = CreateWindowButton("\u25A1", 44, 0);
             maximizeButton.Click += delegate
             {
                 WindowState = WindowState == FormWindowState.Maximized
                     ? FormWindowState.Normal
                     : FormWindowState.Maximized;
             };
-            header.Controls.Add(maximizeButton);
+            windowActions.Controls.Add(maximizeButton);
 
-            Label closeButton = CreateWindowButton("X", 0, 0);
-            closeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            closeButton.Location = new Point(header.Width - 44, 0);
+            Label closeButton = CreateWindowButton("X", 88, 0);
             closeButton.Click += delegate { Close(); };
-            header.Controls.Add(closeButton);
+            windowActions.Controls.Add(closeButton);
 
             return header;
         }
@@ -745,18 +746,18 @@ namespace MbsTerminalSetup
             button.TextAlign = ContentAlignment.MiddleCenter;
             button.Font = CreateFont(10.5F, FontStyle.Bold);
             button.ForeColor = TextColor;
-            button.BackColor = Color.FromArgb(24, 24, 34);
+            button.BackColor = Color.FromArgb(12, 13, 19);
             button.Location = new Point(left, top);
             button.Size = new Size(44, 44);
             button.Cursor = Cursors.Hand;
             button.MouseEnter += delegate
             {
-                button.BackColor = text == "X" ? DangerColor : Color.FromArgb(37, 38, 50);
+                button.BackColor = text == "X" ? DangerColor : Color.FromArgb(35, 36, 48);
                 button.ForeColor = Color.White;
             };
             button.MouseLeave += delegate
             {
-                button.BackColor = Color.FromArgb(24, 24, 34);
+                button.BackColor = Color.FromArgb(12, 13, 19);
                 button.ForeColor = TextColor;
             };
             return button;

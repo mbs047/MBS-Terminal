@@ -758,9 +758,9 @@ Get-ChildItem -Path (Join-Path $iconsSource '*.png') | Copy-Item -Destination $i
 Write-Step 'Installing Starship config.'
 $starshipTarget = Join-Path $HOME '.config\starship.toml'
 Copy-FileEnsuringDirectory -Source $starshipSource -Destination $starshipTarget
-$starshipContent = Get-Content -LiteralPath $starshipTarget -Raw
+$starshipContent = [System.IO.File]::ReadAllText($starshipTarget, [System.Text.Encoding]::UTF8)
 $starshipContent = $starshipContent.Replace('__MBS_DISPLAY_NAME__', $DisplayName)
-Set-Content -LiteralPath $starshipTarget -Value $starshipContent -Encoding UTF8
+[System.IO.File]::WriteAllText($starshipTarget, $starshipContent, [System.Text.UTF8Encoding]::new($true))
 
 Write-Step 'Installing PowerShell helper profile.'
 Install-PowerShellProfile -SourceProfile $profileSource -TargetProfile $PROFILE.CurrentUserCurrentHost -PortfolioPath $StartingDirectory -DisplayName $DisplayName

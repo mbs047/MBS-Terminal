@@ -1,0 +1,160 @@
+{
+    "$help": "https://aka.ms/terminal-documentation",
+    "$schema": "https://aka.ms/terminal-profiles-schema",
+    "actions": [],
+    "alwaysShowTabs": true,
+    "centerOnLaunch": true,
+    "copyFormatting": "none",
+    "copyOnSelect": false,
+    "defaultProfile": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
+    "initialCols": 132,
+    "initialRows": 34,
+    "keybindings": 
+    [
+        {
+            "id": "Terminal.DuplicatePaneAuto",
+            "keys": "alt+shift+d"
+        },
+        {
+            "id": "Terminal.ToggleFocusMode",
+            "keys": "ctrl+shift+space"
+        },
+        {
+            "id": "Terminal.ToggleCommandPalette",
+            "keys": "ctrl+shift+p"
+        },
+        {
+            "id": "Terminal.PasteFromClipboard",
+            "keys": "ctrl+v"
+        },
+        {
+            "id": "Terminal.FindText",
+            "keys": "ctrl+shift+f"
+        },
+        {
+            "id": "Terminal.DuplicatePaneRight",
+            "keys": "alt+shift+plus"
+        },
+        {
+            "id": "Terminal.CopyToClipboard",
+            "keys": "ctrl+c"
+        },
+        {
+            "id": "Terminal.DuplicatePaneDown",
+            "keys": "alt+shift+minus"
+        }
+    ],
+    "newTabMenu": 
+    [
+        {
+            "type": "remainingProfiles"
+        }
+    ],
+    "profiles": 
+    {
+        "defaults": 
+        {
+            "antialiasingMode": "grayscale",
+            "bellStyle": "taskbar",
+            "colorScheme": "MBS Midnight",
+            "cursorColor": "#7DCFFF",
+            "cursorShape": "filledBox",
+            "font": 
+            {
+                "face": "Cascadia Code",
+                "size": 12,
+                "weight": "semi-bold"
+            },
+            "intenseTextStyle": "bright",
+            "opacity": 68,
+            "padding": "14, 12, 14, 12",
+            "scrollbarState": "hidden",
+            "selectionBackground": "#284B63",
+            "useAcrylic": true
+        },
+        "list": 
+        [
+            {
+                "commandline": "%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoLogo",
+                "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
+                "hidden": false,
+                "icon": "C:/Users/mbaob/.config/terminal-icons/mbs-pixel-avatar.png",
+                "name": "⚡ MBS Dev Shell",
+                "startingDirectory": "W:\\GitHub\\MBS-Portfolio",
+                "tabTitle": "⚡ MBS Dev"
+            },
+            {
+                "commandline": "%SystemRoot%\\System32\\cmd.exe",
+                "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}",
+                "hidden": false,
+                "icon": "C:/Users/mbaob/.config/terminal-icons/mbs-cmd.png",
+                "name": "▸ Command Prompt",
+                "startingDirectory": "W:\\GitHub\\MBS-Portfolio"
+            },
+            {
+                "guid": "{b453ae62-4e3d-5e58-b989-0a998ec441b8}",
+                "hidden": false,
+                "icon": "C:/Users/mbaob/.config/terminal-icons/mbs-cloud.png",
+                "name": "☁ Azure Cloud Shell",
+                "source": "Windows.Terminal.Azure"
+            }
+        ]
+    },
+    "schemes": 
+    [
+        {
+            "background": "#0B1020",
+            "black": "#0B1020",
+            "blue": "#7AA2F7",
+            "brightBlack": "#53627A",
+            "brightBlue": "#9ABDF5",
+            "brightCyan": "#9BE8FF",
+            "brightGreen": "#B9F27C",
+            "brightPurple": "#D7A7FF",
+            "brightRed": "#FF8EA3",
+            "brightWhite": "#FFFFFF",
+            "brightYellow": "#FFD580",
+            "cursorColor": "#7DCFFF",
+            "cyan": "#7DCFFF",
+            "foreground": "#D6DEEB",
+            "green": "#9ECE6A",
+            "name": "MBS Midnight",
+            "purple": "#C099FF",
+            "red": "#F7768E",
+            "selectionBackground": "#284B63",
+            "white": "#C7D1E0",
+            "yellow": "#E0AF68"
+        }
+    ],
+    "showTabsInTitlebar": true,
+    "showTerminalTitleInTitlebar": false,
+    "tabWidthMode": "equal",
+    "theme": "MBS Midnight",
+    "themes": 
+    [
+        {
+            "name": "MBS Midnight",
+            "tab": 
+            {
+                "background": "#111827CC",
+                "iconStyle": "default",
+                "showCloseButton": "hover",
+                "unfocusedBackground": "#0B102099"
+            },
+            "tabRow": 
+            {
+                "background": "#070A1299",
+                "unfocusedBackground": "#070A12CC"
+            },
+            "window": 
+            {
+                "applicationTheme": "dark",
+                "experimental.rainbowFrame": false,
+                "frame": null,
+                "unfocusedFrame": null,
+                "useMica": true
+            }
+        }
+    ],
+    "useAcrylicInTabRow": true
+}

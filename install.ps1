@@ -1,6 +1,11 @@
 param(
     [string] $StartingDirectory = '',
-    [switch] $InstallDependencies
+    [switch] $InstallDependencies,
+    [switch] $InstallPhp,
+    [string] $PhpDirectory = '',
+    [switch] $InstallComposer,
+    [switch] $InstallLaravel,
+    [switch] $InstallValet
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,6 +46,259 @@ function Copy-FileEnsuringDirectory {
     }
 
     Copy-Item -LiteralPath $Source -Destination $Destination -Force
+}
+
+function Add-UserPathEntry {
+    param([string] $Directory)
+
+    if ([string]::IsNullOrWhiteSpace($Directory)) {
+        return
+    }
+
+    $resolvedDirectory = [Environment]::ExpandEnvironmentVariables($Directory)
+
+    if (-not (Test-Path -LiteralPath $resolvedDirectory)) {
+        Write-SoftWarning "Path entry was not found, skipping PATH update: $resolvedDirectory"
+        return
+    }
+
+    $currentUserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $entries = @()
+
+    if (-not [string]::IsNullOrWhiteSpace($currentUserPath)) {
+        $entries = $currentUserPath -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    }
+
+    $hasEntry = $entries | Where-Object { $_.TrimEnd('\') -ieq $resolvedDirectory.TrimEnd('\') } | Select-Object -First 1
+
+    if (-not $hasEntry) {
+        $entries += $resolvedDirectory
+        [Environment]::SetEnvironmentVariable('Path', ($entries -join ';'), 'User')
+        Write-Step "Added to user PATH: $resolvedDirectory"
+    }
+
+    $processEntries = $env:Path -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    $hasProcessEntry = $processEntries | Where-Object { $_.TrimEnd('\') -ieq $resolvedDirectory.TrimEnd('\') } | Select-Object -First 1
+
+    if (-not $hasProcessEntry) {
+        $env:Path = "$resolvedDirectory;$env:Path"
+    }
+}
+
+function Refresh-ProcessPath {
+    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $env:Path = @($machinePath, $userPath) -join ';'
+}
+
+function Get-PhpExecutable {
+    if (-not [string]::IsNullOrWhiteSpace($PhpDirectory)) {
+        $expandedPath = [Environment]::ExpandEnvironmentVariables($PhpDirectory)
+        $candidate = if ((Split-Path -Leaf $expandedPath) -ieq 'php.exe') {
+            $expandedPath
+        } else {
+            Join-Path $expandedPath 'php.exe'
+        }
+
+        if (Test-Path -LiteralPath $candidate) {
+            return $candidate
+        }
+    }
+
+    $command = Get-Command php -ErrorAction SilentlyContinue
+
+    if ($command) {
+        return $command.Source
+    }
+
+    return ''
+}
+
+function Get-ComposerGlobalBin {
+    return Join-Path $env:APPDATA 'Composer\vendor\bin'
+}
+
+function Invoke-ExternalCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $FilePath,
+
+        [Parameter(Mandatory = $true)]
+        [string[]] $Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Description
+    )
+
+    Write-Step $Description
+    & $FilePath @Arguments
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Description failed with exit code $LASTEXITCODE."
+    }
+}
+
+function Install-PhpIfRequested {
+    if (-not [string]::IsNullOrWhiteSpace($PhpDirectory)) {
+        $phpExecutable = Get-PhpExecutable
+
+        if ([string]::IsNullOrWhiteSpace($phpExecutable)) {
+            Write-SoftWarning "Could not find php.exe in the selected PHP path: $PhpDirectory"
+            return
+        }
+
+        Add-UserPathEntry -Directory (Split-Path -Path $phpExecutable -Parent)
+        Write-Step "Using PHP: $phpExecutable"
+        return
+    }
+
+    if (-not $InstallPhp) {
+        return
+    }
+
+    if (Get-Command php -ErrorAction SilentlyContinue) {
+        Write-Step 'PHP is already available.'
+        return
+    }
+
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        Write-SoftWarning 'winget is not available, so PHP could not be installed automatically.'
+        return
+    }
+
+    try {
+        Invoke-ExternalCommand -FilePath 'winget' -Arguments @(
+            'install',
+            '--id',
+            'PHP.PHP.8.4',
+            '--exact',
+            '--source',
+            'winget',
+            '--accept-package-agreements',
+            '--accept-source-agreements'
+        ) -Description 'Installing PHP 8.4 through winget.'
+        Refresh-ProcessPath
+    } catch {
+        Write-SoftWarning "Could not install PHP automatically. $($_.Exception.Message)"
+    }
+}
+
+function Install-ComposerIfRequested {
+    if (-not $InstallComposer) {
+        return
+    }
+
+    if (Get-Command composer -ErrorAction SilentlyContinue) {
+        Write-Step 'Composer is already available.'
+        Add-UserPathEntry -Directory (Get-ComposerGlobalBin)
+        return
+    }
+
+    $phpExecutable = Get-PhpExecutable
+
+    if ([string]::IsNullOrWhiteSpace($phpExecutable)) {
+        Write-SoftWarning 'Composer needs PHP first. Install PHP or select an existing PHP directory, then run this installer again.'
+        return
+    }
+
+    $setupPath = Join-Path $env:TEMP 'Composer-Setup.exe'
+
+    try {
+        Write-Step 'Downloading Composer setup.'
+        Invoke-WebRequest -Uri 'https://getcomposer.org/Composer-Setup.exe' -OutFile $setupPath -UseBasicParsing
+
+        $setupArguments = @(
+            '/VERYSILENT',
+            '/SUPPRESSMSGBOXES',
+            '/NORESTART',
+            "/PHP=$phpExecutable"
+        )
+
+        $process = Start-Process -FilePath $setupPath -ArgumentList $setupArguments -Wait -PassThru
+
+        if ($process.ExitCode -ne 0) {
+            throw "Composer setup failed with exit code $($process.ExitCode)."
+        }
+
+        Refresh-ProcessPath
+        Add-UserPathEntry -Directory (Get-ComposerGlobalBin)
+
+        if (Get-Command composer -ErrorAction SilentlyContinue) {
+            Write-Step 'Composer installed.'
+        } else {
+            Write-SoftWarning 'Composer setup finished, but composer was not found in this process PATH yet. Open a new terminal and try again.'
+        }
+    } catch {
+        Write-SoftWarning "Could not install Composer automatically. $($_.Exception.Message)"
+    } finally {
+        if (Test-Path -LiteralPath $setupPath) {
+            Remove-Item -LiteralPath $setupPath -Force
+        }
+    }
+}
+
+function Install-ComposerGlobalPackage {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $PackageName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Label
+    )
+
+    $composer = Get-Command composer -ErrorAction SilentlyContinue
+
+    if (-not $composer) {
+        Write-SoftWarning "$Label needs Composer. Select Composer in the installer, or install Composer first."
+        return $false
+    }
+
+    try {
+        Invoke-ExternalCommand -FilePath $composer.Source -Arguments @(
+            'global',
+            'require',
+            $PackageName
+        ) -Description "Installing $Label with Composer."
+        Add-UserPathEntry -Directory (Get-ComposerGlobalBin)
+        Refresh-ProcessPath
+        return $true
+    } catch {
+        Write-SoftWarning "Could not install $Label. $($_.Exception.Message)"
+        return $false
+    }
+}
+
+function Install-LaravelIfRequested {
+    if (-not $InstallLaravel) {
+        return
+    }
+
+    [void](Install-ComposerGlobalPackage -PackageName 'laravel/installer' -Label 'Laravel Installer')
+}
+
+function Install-ValetIfRequested {
+    if (-not $InstallValet) {
+        return
+    }
+
+    $installed = Install-ComposerGlobalPackage -PackageName 'ycodetech/valet-windows' -Label 'Valet for Windows'
+
+    if (-not $installed) {
+        return
+    }
+
+    $valet = Get-Command valet -ErrorAction SilentlyContinue
+
+    if (-not $valet) {
+        Write-SoftWarning 'Valet was installed, but valet was not found in PATH yet. Open a new terminal and run: valet install'
+        return
+    }
+
+    try {
+        Invoke-ExternalCommand -FilePath $valet.Source -Arguments @('install') -Description 'Running valet install.'
+    } catch {
+        Write-SoftWarning "Valet package installed, but valet install did not complete. $($_.Exception.Message)"
+    }
 }
 
 function Install-PSReadLineIfPossible {
@@ -247,6 +505,10 @@ if ($InstallDependencies) {
     Install-StarshipIfRequested
 }
 
+Install-PhpIfRequested
+Install-ComposerIfRequested
+Install-LaravelIfRequested
+Install-ValetIfRequested
 Install-PSReadLineIfPossible
 
 Write-Step 'Done. Open a new Windows Terminal tab to see the setup.'

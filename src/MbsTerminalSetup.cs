@@ -486,6 +486,7 @@ namespace MbsTerminalSetup
 
             Shown += delegate
             {
+                CenterWindowOnScreen();
                 startingDirectoryBox.SelectionLength = 0;
                 phpDirectoryBox.SelectionLength = 0;
                 ActiveControl = nextButton;
@@ -517,6 +518,16 @@ namespace MbsTerminalSetup
 
             ClientSize = new Size(desiredClientWidth, desiredClientHeight);
             MinimumSize = SizeFromClientSize(new Size(desiredClientWidth, desiredClientHeight));
+            CenterWindowOnScreen();
+        }
+
+        private void CenterWindowOnScreen()
+        {
+            Rectangle workingArea = Screen.FromControl(this).WorkingArea;
+            Location = new Point(
+                workingArea.Left + Math.Max(0, (workingArea.Width - Width) / 2),
+                workingArea.Top + Math.Max(0, (workingArea.Height - Height) / 2)
+            );
         }
 
         private static Size MeasureChildBounds(Control parent)

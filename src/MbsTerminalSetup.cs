@@ -932,7 +932,7 @@ namespace MbsTerminalSetup
                 stepHost.Controls.Add(step);
             }
 
-            sidebar.Controls.Add(CreateFloatingLabel("v1.0", 8F, FontStyle.Regular, MutedTextColor, 18, 446, 80, 20));
+            sidebar.Controls.Add(CreateFloatingLabel("v1.0.0", 8F, FontStyle.Regular, MutedTextColor, 18, 446, 80, 20));
             sidebar.Controls.Add(CreateFloatingLabel("Admin installer", 8F, FontStyle.Bold, Color.FromArgb(186, 230, 253), 18, 468, 160, 20));
             return sidebar;
         }

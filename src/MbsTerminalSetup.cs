@@ -109,7 +109,7 @@ namespace MbsTerminalSetup
     internal sealed class InstallerForm : Form
     {
         private const int WizardContentWidth = 520;
-        private const int StepCount = 4;
+        private const int StepCount = 5;
 
         private static readonly Color BackgroundColor = Color.FromArgb(15, 23, 42);
         private static readonly Color HeaderStartColor = Color.FromArgb(8, 14, 26);
@@ -136,21 +136,24 @@ namespace MbsTerminalSetup
             "Profile",
             "Runtime",
             "Tooling",
-            "Review"
+            "Review",
+            "Running"
         };
         private readonly string[] wizardTitles =
         {
             "Terminal Profile",
             "PHP Runtime",
             "Select Other Tooling",
-            "Review & Install"
+            "Review & Install",
+            "Running Installer"
         };
         private readonly string[] wizardDescriptions =
         {
             "Set the Windows Terminal starting folder and optional prompt dependency.",
             "Install PHP automatically, use an existing PHP folder, and prepare Composer.",
             "See what is already installed, then choose Laravel, Valet, and update behavior.",
-            "Confirm the plan, then run the installer with live progress."
+            "Confirm the plan before anything changes on the machine.",
+            "PowerShell runs hidden here, with progress and command output visible."
         };
 
         private TextBox startingDirectoryBox;
@@ -161,6 +164,11 @@ namespace MbsTerminalSetup
         private ModernCheckBox installLaravelBox;
         private ModernCheckBox installValetBox;
         private ModernCheckBox updateToolsBox;
+        private Label runTitleLabel;
+        private Label runTextLabel;
+        private FlowLayoutPanel trustPanel;
+        private FlowLayoutPanel actionPanel;
+        private Control guidePanel;
         private Label wizardTitleLabel;
         private Label wizardDescriptionLabel;
         private Label reviewSummaryLabel;
@@ -174,6 +182,7 @@ namespace MbsTerminalSetup
         private RichTextBox logBox;
         private Process installerProcess;
         private int currentStep;
+        private bool installHasRun;
 
         public InstallerForm(InstallerOptions options)
         {
@@ -238,6 +247,7 @@ namespace MbsTerminalSetup
             wizardPages.Add(CreateRuntimePage(options));
             wizardPages.Add(CreateLaravelPage(options));
             wizardPages.Add(CreateReviewPage());
+            wizardPages.Add(CreateRunningPage());
 
             foreach (Control page in wizardPages)
             {
@@ -254,18 +264,18 @@ namespace MbsTerminalSetup
             TableLayoutPanel runLayout = CreateRunLayout();
             runPanel.Controls.Add(runLayout);
 
-            Label runTitle = CreateLabel("Install Run", 18F, FontStyle.Bold, TextColor);
-            runLayout.Controls.Add(runTitle, 0, 0);
+            runTitleLabel = CreateLabel("Wizard Progress", 18F, FontStyle.Bold, TextColor);
+            runLayout.Controls.Add(runTitleLabel, 0, 0);
 
-            Label runText = CreateLabel(
-                "The final step runs install.ps1 without opening a terminal. Output stays here.",
+            runTextLabel = CreateLabel(
+                "Choose options on the left. The command log appears only on the Running step.",
                 9.5F,
                 FontStyle.Regular,
                 MutedTextColor
             );
-            runLayout.Controls.Add(runText, 0, 1);
+            runLayout.Controls.Add(runTextLabel, 0, 1);
 
-            FlowLayoutPanel trustPanel = new FlowLayoutPanel();
+            trustPanel = new FlowLayoutPanel();
             trustPanel.Dock = DockStyle.Fill;
             trustPanel.FlowDirection = FlowDirection.LeftToRight;
             trustPanel.WrapContents = false;
@@ -276,7 +286,7 @@ namespace MbsTerminalSetup
             trustPanel.Controls.Add(CreateStatusBadge("Hidden shell"));
             runLayout.Controls.Add(trustPanel, 0, 2);
 
-            FlowLayoutPanel actionPanel = new FlowLayoutPanel();
+            actionPanel = new FlowLayoutPanel();
             actionPanel.Dock = DockStyle.Fill;
             actionPanel.FlowDirection = FlowDirection.LeftToRight;
             actionPanel.WrapContents = false;
@@ -309,6 +319,9 @@ namespace MbsTerminalSetup
 
             statusLabel = CreateLabel("Ready to configure", 11F, FontStyle.Bold, TextColor);
             runLayout.Controls.Add(statusLabel, 0, 5);
+
+            guidePanel = CreateRunGuidePanel();
+            runLayout.Controls.Add(guidePanel, 0, 6);
 
             logBox = new RichTextBox();
             logBox.BackColor = Color.FromArgb(6, 10, 17);
@@ -535,7 +548,7 @@ namespace MbsTerminalSetup
 
             for (int index = 0; index < StepCount; index++)
             {
-                stepper.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+                stepper.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F / StepCount));
 
                 Label step = new Label();
                 step.AutoSize = false;
@@ -548,6 +561,11 @@ namespace MbsTerminalSetup
                 int capturedIndex = index;
                 step.Click += delegate
                 {
+                    if (IsInstalling() || (capturedIndex == StepCount - 1 && !installHasRun))
+                    {
+                        return;
+                    }
+
                     currentStep = capturedIndex;
                     UpdateWizard();
                 };
@@ -574,6 +592,21 @@ namespace MbsTerminalSetup
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             return layout;
+        }
+
+        private static Control CreateRunGuidePanel()
+        {
+            RoundedPanel panel = new RoundedPanel();
+            panel.Dock = DockStyle.Fill;
+            panel.FillColor = FieldColor;
+            panel.BorderColor = Color.FromArgb(54, 68, 91);
+            panel.Radius = 8;
+            panel.BackColor = SurfaceColor;
+            panel.Margin = new Padding(0);
+
+            panel.Controls.Add(CreateFloatingLabel("No command output yet", 14F, FontStyle.Bold, TextColor, 20, 22, 440, 32));
+            panel.Controls.Add(CreateFloatingLabel("Complete Profile, Runtime, Tooling, and Review. When you click Install, the wizard moves to Running and opens the terminal-style log here.", 9.4F, FontStyle.Regular, MutedTextColor, 20, 62, 460, 74));
+            return panel;
         }
 
         private Control CreateProfilePage(InstallerOptions options)
@@ -657,6 +690,14 @@ namespace MbsTerminalSetup
             reviewCard.Controls.Add(reviewSummaryLabel);
             page.Controls.Add(reviewCard);
             page.Controls.Add(CreateNoteCard("Click Install only when this summary matches what you want for this Windows machine."));
+            return page;
+        }
+
+        private Control CreateRunningPage()
+        {
+            FlowLayoutPanel page = CreateWizardPage();
+            page.Controls.Add(CreateSummaryGrid("Running", "The installer is running separately now. Watch the log panel on the right for live output."));
+            page.Controls.Add(CreateNoteCard("You can cancel while the process is running. Closing the window will ask before stopping the installer."));
             return page;
         }
 
@@ -1075,16 +1116,48 @@ namespace MbsTerminalSetup
                 stepLabels[index].ForeColor = isActive ? Color.FromArgb(4, 15, 13) : TextColor;
             }
 
-            backButton.Enabled = currentStep > 0 && !IsInstalling();
-            nextButton.Visible = currentStep < StepCount - 1;
-            nextButton.Enabled = !IsInstalling();
-            installButton.Visible = currentStep == StepCount - 1 || IsInstalling();
-            installButton.Enabled = currentStep == StepCount - 1 && !IsInstalling();
+            bool terminalVisible = currentStep == StepCount - 1 || IsInstalling();
+            bool isReviewStep = currentStep == StepCount - 2;
 
-            if (currentStep == StepCount - 1)
+            backButton.Enabled = currentStep > 0 && currentStep < StepCount - 1 && !IsInstalling();
+            nextButton.Visible = currentStep < StepCount - 2;
+            nextButton.Enabled = !IsInstalling();
+            installButton.Visible = isReviewStep;
+            installButton.Enabled = isReviewStep && !IsInstalling();
+            cancelButton.Visible = terminalVisible;
+            trustPanel.Visible = terminalVisible;
+            progressBar.Visible = terminalVisible;
+            logBox.Visible = terminalVisible;
+            guidePanel.Visible = !terminalVisible;
+            actionPanel.Visible = isReviewStep || terminalVisible;
+            runTitleLabel.Text = terminalVisible ? "Running Installer" : "Wizard Progress";
+            runTextLabel.Text = terminalVisible
+                ? "PowerShell is hidden. Output from install.ps1 appears below."
+                : "Choose options on the left. The command log appears only on the Running step.";
+
+            if (isReviewStep)
             {
                 UpdateReviewSummary();
                 statusLabel.Text = "Ready to install";
+            }
+            else if (currentStep == StepCount - 1)
+            {
+                if (IsInstalling())
+                {
+                    statusLabel.Text = "Installing...";
+                }
+                else if (installHasRun && ExitCode == 0)
+                {
+                    statusLabel.Text = "Installed successfully";
+                }
+                else if (installHasRun)
+                {
+                    statusLabel.Text = "Installation failed";
+                }
+                else
+                {
+                    statusLabel.Text = "Ready to run";
+                }
             }
             else
             {
@@ -1138,9 +1211,9 @@ namespace MbsTerminalSetup
 
         private void InstallButtonClick(object sender, EventArgs e)
         {
-            if (currentStep != StepCount - 1)
+            if (currentStep != StepCount - 2)
             {
-                currentStep = StepCount - 1;
+                currentStep = StepCount - 2;
                 UpdateWizard();
                 return;
             }
@@ -1192,6 +1265,9 @@ namespace MbsTerminalSetup
                 startingDirectoryBox.Text = startingDirectory;
             }
 
+            currentStep = StepCount - 1;
+            installHasRun = true;
+            UpdateWizard();
             SetWizardEnabled(false);
             installButton.Enabled = false;
             cancelButton.Enabled = true;

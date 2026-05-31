@@ -5,7 +5,8 @@ param(
     [string] $PhpDirectory = '',
     [switch] $InstallComposer,
     [switch] $InstallLaravel,
-    [switch] $InstallValet
+    [switch] $InstallValet,
+    [switch] $UpdateTools
 )
 
 $ErrorActionPreference = 'Stop'
@@ -157,7 +158,25 @@ function Install-PhpIfRequested {
     }
 
     if (Get-Command php -ErrorAction SilentlyContinue) {
-        Write-Step 'PHP is already available.'
+        if ($UpdateTools -and (Get-Command winget -ErrorAction SilentlyContinue)) {
+            try {
+                Invoke-ExternalCommand -FilePath 'winget' -Arguments @(
+                    'upgrade',
+                    '--id',
+                    'PHP.PHP.8.4',
+                    '--exact',
+                    '--source',
+                    'winget',
+                    '--accept-package-agreements',
+                    '--accept-source-agreements'
+                ) -Description 'Updating PHP 8.4 through winget.'
+                Refresh-ProcessPath
+            } catch {
+                Write-SoftWarning "Could not update PHP automatically. $($_.Exception.Message)"
+            }
+        } else {
+            Write-Step 'PHP is already available.'
+        }
         return
     }
 
@@ -189,7 +208,16 @@ function Install-ComposerIfRequested {
     }
 
     if (Get-Command composer -ErrorAction SilentlyContinue) {
-        Write-Step 'Composer is already available.'
+        if ($UpdateTools) {
+            try {
+                $composer = Get-Command composer -ErrorAction Stop
+                Invoke-ExternalCommand -FilePath $composer.Source -Arguments @('self-update') -Description 'Updating Composer.'
+            } catch {
+                Write-SoftWarning "Could not update Composer automatically. $($_.Exception.Message)"
+            }
+        } else {
+            Write-Step 'Composer is already available.'
+        }
         Add-UserPathEntry -Directory (Get-ComposerGlobalBin)
         return
     }

@@ -23,17 +23,27 @@ function Build-WindowsExecutable {
         [string] $Source,
 
         [Parameter(Mandatory = $true)]
-        [string] $Output
+        [string] $Output,
+
+        [string] $Icon = ''
     )
 
-    & $compiler `
-        /nologo `
-        /optimize+ `
-        /target:winexe `
-        /reference:System.Drawing.dll `
-        /reference:System.Windows.Forms.dll `
-        "/out:$Output" `
-        $Source
+    $compilerArguments = @(
+        '/nologo',
+        '/optimize+',
+        '/target:winexe',
+        '/reference:System.Drawing.dll',
+        '/reference:System.Windows.Forms.dll',
+        "/out:$Output"
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($Icon) -and (Test-Path -LiteralPath $Icon)) {
+        $compilerArguments += "/win32icon:$Icon"
+    }
+
+    $compilerArguments += $Source
+
+    & $compiler @compilerArguments
 
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
@@ -44,7 +54,8 @@ function Build-WindowsExecutable {
 
 Build-WindowsExecutable `
     -Source (Join-Path $repositoryRoot 'src\MbsTerminalSetup.cs') `
-    -Output (Join-Path $repositoryRoot 'MBS-Terminal-Setup.exe')
+    -Output (Join-Path $repositoryRoot 'MBS-Terminal-Setup.exe') `
+    -Icon (Join-Path $repositoryRoot 'assets\terminal-icons\mbs-terminal.ico')
 
 Build-WindowsExecutable `
     -Source (Join-Path $repositoryRoot 'src\MbsTerminalRestore.cs') `

@@ -638,6 +638,10 @@ function Get-ComposerBackupInstallDirectory {
     return $baseDirectory
 }
 
+function Get-ComposerBackupPharPath {
+    return Join-Path (Get-ComposerBackupInstallDirectory) 'composer.phar'
+}
+
 function Get-ValetComposerHome {
     return Join-Path $env:APPDATA 'Composer\mbs-valet'
 }
@@ -714,47 +718,172 @@ function Invoke-WingetInstall {
     return $false
 }
 
-function Test-ComposerCommand {
-    param([string] $ComposerCommand = '')
+function ConvertTo-NativeCommandArgument {
+    param([AllowNull()][string] $Value)
 
-    if ([string]::IsNullOrWhiteSpace($ComposerCommand)) {
-        $command = Get-Command composer -ErrorAction SilentlyContinue
-
-        if (-not $command) {
-            return $false
-        }
-
-        $ComposerCommand = $command.Source
+    if ($null -eq $Value -or $Value.Length -eq 0) {
+        return '""'
     }
 
-    if (-not (Test-Path -LiteralPath $ComposerCommand)) {
+    if ($Value -notmatch '[\s"]') {
+        return $Value
+    }
+
+    $quotedValue = '"'
+    $backslashCount = 0
+
+    foreach ($character in $Value.ToCharArray()) {
+        if ($character -eq '\') {
+            $backslashCount++
+            continue
+        }
+
+        if ($character -eq '"') {
+            if ($backslashCount -gt 0) {
+                $quotedValue += ('\' * ($backslashCount * 2))
+                $backslashCount = 0
+            }
+
+            $quotedValue += '\"'
+            continue
+        }
+
+        if ($backslashCount -gt 0) {
+            $quotedValue += ('\' * $backslashCount)
+            $backslashCount = 0
+        }
+
+        $quotedValue += $character
+    }
+
+    if ($backslashCount -gt 0) {
+        $quotedValue += ('\' * ($backslashCount * 2))
+    }
+
+    $quotedValue += '"'
+    return $quotedValue
+}
+
+function Invoke-NativeCommandForOutput {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $FilePath,
+
+        [string[]] $Arguments = @(),
+
+        [int] $TimeoutSeconds = 30
+    )
+
+    if ($TimeoutSeconds -lt 1) {
+        $TimeoutSeconds = 30
+    }
+
+    $process = $null
+
+    try {
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $FilePath
+        $startInfo.Arguments = ((@($Arguments) | ForEach-Object { ConvertTo-NativeCommandArgument -Value $_ }) -join ' ')
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+
+        [void] $process.Start()
+
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            try {
+                $process.Kill()
+            } catch {
+            }
+
+            return [pscustomobject]@{
+                ExitCode = $null
+                TimedOut = $true
+                Output = @()
+                ErrorMessage = ''
+            }
+        }
+
+        $standardOutput = $process.StandardOutput.ReadToEnd()
+        $standardError = $process.StandardError.ReadToEnd()
+        $outputLines = New-Object System.Collections.Generic.List[string]
+
+        foreach ($line in @($standardOutput -split "\r?\n")) {
+            if (-not [string]::IsNullOrWhiteSpace($line)) {
+                [void] $outputLines.Add($line)
+            }
+        }
+
+        foreach ($line in @($standardError -split "\r?\n")) {
+            if (-not [string]::IsNullOrWhiteSpace($line)) {
+                [void] $outputLines.Add($line)
+            }
+        }
+
+        return [pscustomobject]@{
+            ExitCode = $process.ExitCode
+            TimedOut = $false
+            Output = $outputLines.ToArray()
+            ErrorMessage = ''
+        }
+    } catch {
+        return [pscustomobject]@{
+            ExitCode = $null
+            TimedOut = $false
+            Output = @()
+            ErrorMessage = $_.Exception.Message
+        }
+    } finally {
+        if ($process) {
+            $process.Dispose()
+        }
+    }
+}
+
+function Test-ComposerPhar {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $PhpExecutable,
+
+        [Parameter(Mandatory = $true)]
+        [string] $ComposerPhar
+    )
+
+    if (-not (Test-Path -LiteralPath $PhpExecutable)) {
         return $false
     }
 
-    $previousErrorActionPreference = $ErrorActionPreference
-
-    try {
-        $ErrorActionPreference = 'Continue'
-        $output = @(& $ComposerCommand --version --no-ansi 2>&1)
-        $exitCode = $LASTEXITCODE
-
-        if ($exitCode -eq 0) {
-            $firstLine = $output | Select-Object -First 1
-
-            if (-not [string]::IsNullOrWhiteSpace($firstLine)) {
-                Write-Step $firstLine
-            }
-
-            return $true
-        }
-
-        Write-SoftWarning "composer was found but did not run correctly (exit code $exitCode)."
-    } catch {
-        Write-SoftWarning "composer was found but could not start. $($_.Exception.Message)"
-    } finally {
-        $ErrorActionPreference = $previousErrorActionPreference
+    if (-not (Test-Path -LiteralPath $ComposerPhar)) {
+        return $false
     }
 
+    $result = Invoke-NativeCommandForOutput -FilePath $PhpExecutable -Arguments @($ComposerPhar, '--version', '--no-ansi') -TimeoutSeconds 30
+
+    if ($result.TimedOut) {
+        Write-SoftWarning 'composer.phar verification timed out. Continuing without blocking the installer.'
+        return $false
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($result.ErrorMessage)) {
+        Write-SoftWarning "composer.phar could not start. $($result.ErrorMessage)"
+        return $false
+    }
+
+    if ($result.ExitCode -eq 0) {
+        $firstLine = $result.Output | Select-Object -First 1
+
+        if (-not [string]::IsNullOrWhiteSpace($firstLine)) {
+            Write-Step $firstLine
+        }
+
+        return $true
+    }
+
+    Write-SoftWarning "composer.phar did not run correctly (exit code $($result.ExitCode))."
     return $false
 }
 
@@ -789,6 +918,83 @@ function New-ComposerCommandWrappers {
     Set-Content -LiteralPath $powershellPath -Value ($powershellContent -join [Environment]::NewLine) -Encoding ASCII
 }
 
+function Get-ComposerRunner {
+    $phpExecutable = Get-PhpExecutable
+    $composerPhar = Get-ComposerBackupPharPath
+
+    if ((-not [string]::IsNullOrWhiteSpace($phpExecutable)) -and
+        (Test-Path -LiteralPath $phpExecutable) -and
+        (Test-Path -LiteralPath $composerPhar)) {
+        return [pscustomobject]@{
+            FilePath = $phpExecutable
+            PrefixArguments = @($composerPhar)
+        }
+    }
+
+    $composer = Get-Command composer -ErrorAction SilentlyContinue
+
+    if ($composer) {
+        return [pscustomobject]@{
+            FilePath = $composer.Source
+            PrefixArguments = @()
+        }
+    }
+
+    return $null
+}
+
+function Invoke-ComposerCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]] $Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Description
+    )
+
+    $runner = Get-ComposerRunner
+
+    if (-not $runner) {
+        throw 'Composer was not found.'
+    }
+
+    $prefixArguments = @()
+
+    if ($runner.PrefixArguments) {
+        $prefixArguments = @($runner.PrefixArguments)
+    }
+
+    Invoke-ExternalCommand -FilePath $runner.FilePath -Arguments ($prefixArguments + @($Arguments)) -Description $Description
+}
+
+function Invoke-ComposerCommandForExitCode {
+    param([string[]] $Arguments)
+
+    $runner = Get-ComposerRunner
+
+    if (-not $runner) {
+        return $null
+    }
+
+    $prefixArguments = @()
+
+    if ($runner.PrefixArguments) {
+        $prefixArguments = @($runner.PrefixArguments)
+    }
+
+    $previousErrorActionPreference = $ErrorActionPreference
+
+    try {
+        $ErrorActionPreference = 'Continue'
+        & $runner.FilePath @($prefixArguments + @($Arguments)) 1>$null 2>$null
+        return $LASTEXITCODE
+    } catch {
+        return $null
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+}
+
 function Install-ComposerFromPhar {
     param([string] $PhpExecutable)
 
@@ -798,8 +1004,7 @@ function Install-ComposerFromPhar {
     }
 
     $installDirectory = Get-ComposerBackupInstallDirectory
-    $composerPhar = Join-Path $installDirectory 'composer.phar'
-    $composerCommand = Join-Path $installDirectory 'composer.bat'
+    $composerPhar = Get-ComposerBackupPharPath
 
     try {
         if (-not (Test-Path -LiteralPath $installDirectory)) {
@@ -813,7 +1018,7 @@ function Install-ComposerFromPhar {
         Add-PathEntry -Directory $installDirectory
         Refresh-ProcessPath
 
-        if (Test-ComposerCommand -ComposerCommand $composerCommand) {
+        if (Test-ComposerPhar -PhpExecutable $PhpExecutable -ComposerPhar $composerPhar) {
             Write-Step "Composer installed from phar backup: $installDirectory"
             return $true
         }
@@ -980,9 +1185,7 @@ function Install-ComposerGlobalPackage {
         [string] $ComposerHome = ''
     )
 
-    $composer = Get-Command composer -ErrorAction SilentlyContinue
-
-    if (-not $composer) {
+    if (-not (Get-ComposerRunner)) {
         Write-SoftWarning "$Label needs Composer. Select Composer in the installer, or install Composer first."
         return $false
     }
@@ -998,7 +1201,7 @@ function Install-ComposerGlobalPackage {
             $env:COMPOSER_HOME = $ComposerHome
         }
 
-        Invoke-ExternalCommand -FilePath $composer.Source -Arguments @(
+        Invoke-ComposerCommand -Arguments @(
             'global',
             'require',
             $PackageName,
@@ -1031,29 +1234,18 @@ function Remove-ComposerGlobalPackageIfInstalled {
         [string] $Label
     )
 
-    $composer = Get-Command composer -ErrorAction SilentlyContinue
-
-    if (-not $composer) {
+    if (-not (Get-ComposerRunner)) {
         return
     }
 
-    $previousErrorActionPreference = $ErrorActionPreference
+    $showExitCode = Invoke-ComposerCommandForExitCode -Arguments @('global', 'show', $PackageName, '--no-interaction', '--no-ansi')
 
-    try {
-        $ErrorActionPreference = 'Continue'
-        & $composer.Source global show $PackageName --no-interaction --no-ansi 1>$null 2>$null
-    } catch {
-        return
-    } finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
-
-    if ($LASTEXITCODE -ne 0) {
+    if ($showExitCode -ne 0) {
         return
     }
 
     try {
-        Invoke-ExternalCommand -FilePath $composer.Source -Arguments @(
+        Invoke-ComposerCommand -Arguments @(
             'global',
             'remove',
             $PackageName,

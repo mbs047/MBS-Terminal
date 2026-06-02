@@ -126,9 +126,14 @@ try {
     Install-PhpIfRequested
     Install-ComposerIfRequested
 
+    $phpExecutable = Join-Path $env:LOCALAPPDATA "MBS-Terminal\PHP\$PhpVersion\php.exe"
     $composerDirectory = Join-Path $env:LOCALAPPDATA 'MBS-Terminal\Composer'
     $composerCommand = Join-Path $composerDirectory 'composer.bat'
     $composerPhar = Join-Path $composerDirectory 'composer.phar'
+
+    if (-not (Test-Path -LiteralPath $phpExecutable)) {
+        throw "Expected fallback php.exe was not installed: $phpExecutable"
+    }
 
     if (-not (Test-Path -LiteralPath $composerCommand)) {
         throw "Expected composer wrapper was not created: $composerCommand"
@@ -160,16 +165,63 @@ try {
     $ErrorActionPreference = 'Continue'
 
     try {
-        $composerOutput = @(& $composerCommand --version --no-ansi 2>&1)
+        $composerOutput = @(& $phpExecutable $composerPhar --version --no-ansi 2>&1)
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference
     }
 
     if ($LASTEXITCODE -ne 0) {
-        throw "composer --version failed with exit code $LASTEXITCODE. $($composerOutput -join ' ')"
+        throw "composer.phar --version failed with exit code $LASTEXITCODE. $($composerOutput -join ' ')"
     }
 
-    Write-Host "PASS Composer setup failure recovered with phar backup: $composerCommand"
+    $script:ComposerInvocation = $null
+
+    function Invoke-ExternalCommand {
+        param(
+            [Parameter(Mandatory = $true)]
+            [string] $FilePath,
+
+            [Parameter(Mandatory = $true)]
+            [string[]] $Arguments,
+
+            [Parameter(Mandatory = $true)]
+            [string] $Description
+        )
+
+        $script:ComposerInvocation = [pscustomobject]@{
+            FilePath = $FilePath
+            Arguments = $Arguments
+            Description = $Description
+        }
+    }
+
+    $laravelComposerHome = Join-Path $tempRoot 'LaravelComposerHome'
+
+    if (-not (Install-ComposerGlobalPackage -PackageName 'laravel/installer' -Label 'Laravel Installer' -ComposerHome $laravelComposerHome)) {
+        throw 'Laravel Installer did not use the fallback Composer runner.'
+    }
+
+    if (-not $script:ComposerInvocation) {
+        throw 'Laravel Installer did not invoke Composer.'
+    }
+
+    if ($script:ComposerInvocation.FilePath -ine $phpExecutable) {
+        throw "Laravel Installer should run PHP directly. Expected $phpExecutable, got $($script:ComposerInvocation.FilePath)"
+    }
+
+    if ($script:ComposerInvocation.Arguments[0] -ine $composerPhar) {
+        throw "Laravel Installer should run composer.phar directly. Expected $composerPhar, got $($script:ComposerInvocation.Arguments[0])"
+    }
+
+    $expectedComposerArguments = @('global', 'require', 'laravel/installer')
+
+    foreach ($expectedArgument in $expectedComposerArguments) {
+        if (-not ($script:ComposerInvocation.Arguments -contains $expectedArgument)) {
+            throw "Laravel Installer Composer invocation missed argument: $expectedArgument"
+        }
+    }
+
+    Write-Host "PASS Composer setup failure recovered with phar backup: $composerPhar"
     Write-Host ($composerOutput | Select-Object -First 1)
 } finally {
     $env:LOCALAPPDATA = $oldLocalAppData

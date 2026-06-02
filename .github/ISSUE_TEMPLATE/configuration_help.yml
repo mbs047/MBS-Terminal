@@ -12,6 +12,7 @@ body:
     id: area
     attributes:
       label: Area
+      description: Choose the part of setup where you need help.
       options:
         - Installer
         - Windows Terminal settings
@@ -25,13 +26,15 @@ body:
     id: windows-version
     attributes:
       label: Windows version
-      placeholder: Windows 11 23H2
+      description: Include the edition/build if you know it. Use "Not sure" if needed.
+      placeholder: Windows 11 23H2 or Not sure
     validations:
       required: true
   - type: input
     id: command
     attributes:
       label: Command you ran
+      description: Include the exact command, installer option, or terminal action.
       placeholder: .\install.ps1 -InstallDependencies
     validations:
       required: true
@@ -39,7 +42,11 @@ body:
     id: problem
     attributes:
       label: What do you need help with?
-      placeholder: Describe the setup issue or question.
+      placeholder: |
+        What you are trying to set up:
+        What happened:
+        What you expected:
+        What you already tried:
     validations:
       required: true
   - type: textarea
@@ -47,11 +54,15 @@ body:
     attributes:
       label: Output or screenshot
       description: Paste safe command output or attach screenshots.
+      placeholder: |
+        Paste the command and safe output here.
+        Include the exact error line or attach a screenshot if this is visual.
       render: shell
   - type: checkboxes
     id: checks
     attributes:
       label: Checklist
+      description: Confirm these before opening the help request.
       options:
         - label: I removed private paths, tokens, or sensitive profile contents.
           required: true

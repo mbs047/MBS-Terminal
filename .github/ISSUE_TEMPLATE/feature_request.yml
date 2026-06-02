@@ -9,7 +9,10 @@ body:
     attributes:
       label: Problem
       description: What workflow or pain point should this improve?
-      placeholder: I want MBS Terminal to...
+      placeholder: |
+        I want MBS Terminal to...
+        Today I have to...
+        This matters because...
     validations:
       required: true
   - type: textarea
@@ -17,18 +20,25 @@ body:
     attributes:
       label: Proposed solution
       description: Describe the behavior you would like.
-      placeholder: Add support for...
+      placeholder: |
+        Add support for...
+        It should work when...
+        Mention any command, installer option, prompt segment, config file, or UI behavior.
     validations:
       required: true
   - type: textarea
     id: alternatives
     attributes:
       label: Alternatives considered
-      placeholder: What workarounds or other designs did you consider?
+      placeholder: |
+        I tried...
+        A workaround is...
+        This is not enough because...
   - type: dropdown
     id: area
     attributes:
       label: Area
+      description: Choose the closest part of MBS Terminal affected by this idea.
       options:
         - Installer
         - Windows Terminal settings
@@ -42,6 +52,7 @@ body:
     id: checks
     attributes:
       label: Checklist
+      description: Confirm this before opening the feature request.
       options:
         - label: I checked existing issues and pull requests first.
           required: true

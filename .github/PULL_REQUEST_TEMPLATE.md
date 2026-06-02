@@ -2,9 +2,13 @@
 
 ## Summary
 
-- Summarize the change and why it is needed.
+- What changed:
+- Why it is needed:
+- User-visible impact:
 
 ## Testing
+
+Mention any platform, terminal profile, or installer option used while testing.
 
 - [ ] Ran `.\install.ps1`
 - [ ] Ran `.\install.ps1 -InstallDependencies`

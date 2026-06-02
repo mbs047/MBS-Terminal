@@ -20,35 +20,42 @@ body:
     id: terminal-version
     attributes:
       label: Windows Terminal version
-      placeholder: 1.20.0
+      description: Open Windows Terminal settings or About to check this. Use "Not sure" if you cannot find it.
+      placeholder: 1.20.0 or Not sure
   - type: input
     id: powershell-version
     attributes:
       label: PowerShell version
-      placeholder: 5.1.22621.2506
+      description: Run `$PSVersionTable.PSVersion` in PowerShell if possible.
+      placeholder: 5.1.22621.2506, 7.4.2, or Not sure
   - type: textarea
     id: steps
     attributes:
       label: Steps to reproduce
       description: List the smallest set of steps that triggers the problem.
       placeholder: |
-        1. Run .\install.ps1
-        2. Open Windows Terminal
-        3. See the error
+        1. Run .\install.ps1 ...
+        2. Open Windows Terminal profile ...
+        3. Trigger the issue by ...
+        4. The error appears when ...
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
       label: Expected behavior
-      placeholder: What did you expect to happen?
+      placeholder: |
+        I expected ...
+        Mention the prompt, profile, icon, command, or installer behavior you wanted to see.
     validations:
       required: true
   - type: textarea
     id: actual
     attributes:
       label: Actual behavior
-      placeholder: What happened instead?
+      placeholder: |
+        Instead, ...
+        Mention exact error text, missing files, broken prompt segments, or visual differences.
     validations:
       required: true
   - type: textarea
@@ -56,11 +63,17 @@ body:
     attributes:
       label: Output or screenshots
       description: Paste safe command output or attach screenshots. Do not include secrets or private profile contents.
+      placeholder: |
+        Paste the command and safe output here.
+        Example:
+        .\install.ps1 -InstallDependencies
+        Error: ...
       render: shell
   - type: checkboxes
     id: checks
     attributes:
       label: Checklist
+      description: Confirm these before opening the bug report.
       options:
         - label: I removed private paths, tokens, or sensitive profile contents.
           required: true

@@ -115,67 +115,6 @@ function ConvertTo-CSharpBase64Expression {
     return 'string.Concat(new string[] { ' + (($chunks.ToArray()) -join ', ') + ' })'
 }
 
-function New-SetupSupportSource {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string] $OutputPath
-    )
-
-    $relativePaths = @(
-        'install.ps1',
-        'configs\starship.toml',
-        'configs\windows-terminal\settings.json',
-        'configs\powershell\laravel-dev.ps1',
-        'assets\terminal-icons\mbs-pixel-avatar.png',
-        'assets\terminal-icons\mbs-dev-shell.png',
-        'assets\terminal-icons\mbs-cmd.png',
-        'assets\terminal-icons\mbs-cloud.png'
-    )
-
-    $lines = New-Object System.Collections.Generic.List[string]
-    $lines.Add('using System;')
-    $lines.Add('using System.IO;')
-    $lines.Add('')
-    $lines.Add('namespace MbsTerminalSetup')
-    $lines.Add('{')
-    $lines.Add('    internal static class EmbeddedSupportFiles')
-    $lines.Add('    {')
-    $lines.Add('        internal static void ExtractTo(string root)')
-    $lines.Add('        {')
-
-    foreach ($relativePath in $relativePaths) {
-        $sourcePath = Join-Path $repositoryRoot $relativePath
-
-        if (-not (Test-Path -LiteralPath $sourcePath)) {
-            throw "Support file was not found: $relativePath"
-        }
-
-        $base64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($sourcePath))
-        $pathLiteral = ConvertTo-CSharpStringLiteral -Value $relativePath
-        $dataExpression = ConvertTo-CSharpBase64Expression -Value $base64
-        $lines.Add("            WriteFile(root, $pathLiteral, $dataExpression);")
-    }
-
-    $lines.Add('        }')
-    $lines.Add('')
-    $lines.Add('        private static void WriteFile(string root, string relativePath, string base64Content)')
-    $lines.Add('        {')
-    $lines.Add('            string path = Path.Combine(root, relativePath);')
-    $lines.Add('            string directory = Path.GetDirectoryName(path);')
-    $lines.Add('')
-    $lines.Add('            if (!string.IsNullOrWhiteSpace(directory))')
-    $lines.Add('            {')
-    $lines.Add('                Directory.CreateDirectory(directory);')
-    $lines.Add('            }')
-    $lines.Add('')
-    $lines.Add('            File.WriteAllBytes(path, Convert.FromBase64String(base64Content));')
-    $lines.Add('        }')
-    $lines.Add('    }')
-    $lines.Add('}')
-
-    [IO.File]::WriteAllText($OutputPath, ($lines -join [Environment]::NewLine), [System.Text.UTF8Encoding]::new($false))
-}
-
 function New-TerminalInstallerSupportSource {
     param(
         [Parameter(Mandatory = $true)]
@@ -244,9 +183,6 @@ if (-not (Test-Path -LiteralPath $generatedDirectory)) {
     New-Item -ItemType Directory -Path $generatedDirectory | Out-Null
 }
 
-$setupSupportSource = Join-Path $generatedDirectory 'MbsTerminalSetupSupport.g.cs'
-New-SetupSupportSource -OutputPath $setupSupportSource
-
 $terminalInstallerSupportSource = Join-Path $generatedDirectory 'MbsTerminalInstallSupport.g.cs'
 New-TerminalInstallerSupportSource -OutputPath $terminalInstallerSupportSource
 
@@ -256,14 +192,6 @@ Build-ConsoleExecutable `
         $terminalInstallerSupportSource
     ) `
     -Output (Join-Path $repositoryRoot 'MBS-Terminal-Install.exe') `
-    -Icon (Join-Path $repositoryRoot 'assets\terminal-icons\mbs-terminal.ico')
-
-Build-WindowsExecutable `
-    -Source @(
-        (Join-Path $repositoryRoot 'src\MbsTerminalSetup.cs'),
-        $setupSupportSource
-    ) `
-    -Output (Join-Path $repositoryRoot 'MBS-Terminal-Setup.exe') `
     -Icon (Join-Path $repositoryRoot 'assets\terminal-icons\mbs-terminal.ico')
 
 Build-WindowsExecutable `

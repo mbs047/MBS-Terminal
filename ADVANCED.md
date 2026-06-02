@@ -98,12 +98,6 @@ For a fresh PC or when the GUI executable does not open, run the interactive ter
 .\MBS-Terminal-Install.exe
 ```
 
-The fallback command launcher is also available:
-
-```powershell
-.\MBS-Terminal-Install.cmd
-```
-
 You can call the PowerShell script directly from a terminal, but do not double-click it:
 
 ```powershell
@@ -171,4 +165,4 @@ The restore script creates timestamped backups before changing anything. It rese
 .\build-installer.ps1
 ```
 
-The build uses the built-in .NET Framework C# compiler on Windows and produces `MBS-Terminal-Install.exe`, `MBS-Terminal-Setup.exe`, and `MBS-Terminal-Restore.exe`.
+The build uses the built-in .NET Framework C# compiler on Windows and produces `MBS-Terminal-Install.exe` and `MBS-Terminal-Restore.exe`.

@@ -6,12 +6,15 @@
 
 - Interactive terminal installer for fresh PCs, including administrator relaunch, `winget` checks, Windows Terminal installation, presets, dry-run support, and sequential handoff to `install.ps1`.
 - Double-clickable terminal installer through `MBS-Terminal-Install.exe`.
-- Command launcher fallback for the terminal installer through `MBS-Terminal-Install.cmd`.
 - Richer terminal installer output with status badges, helper messages, clear sections, and final success, warning, canceled, or failed states.
 
 ### Fixed
 
 - Windows Terminal settings can now be created when Windows Terminal is freshly installed and has not generated `settings.json` yet.
+
+### Removed
+
+- Legacy GUI setup executable and command-file installer fallback so releases have a single primary installer path.
 
 ## v1.0.0 - 2026-05-31
 

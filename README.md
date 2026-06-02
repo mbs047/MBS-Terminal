@@ -23,13 +23,7 @@ The terminal installer is the recommended path on fresh PCs. It opens by double-
 
 `install-terminal.ps1` is the script behind the installer. Do not double-click it directly, because Windows may open `.ps1` files in an editor.
 
-If you prefer the GUI wizard, run:
-
-```powershell
-.\MBS-Terminal-Setup.exe
-```
-
-The installers can install or configure:
+The installer can install or configure:
 
 - Windows Terminal profile and icons.
 - Windows Terminal, when missing from a fresh PC.

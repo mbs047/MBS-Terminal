@@ -173,6 +173,15 @@ Build-Executable `
     -Icon (Join-Path $repositoryRoot 'assets\terminal-icons\mbs-terminal.ico')
 
 Build-Executable `
+    -Source @(
+        (Join-Path $repositoryRoot 'src\MbsTerminalInstallerUi.cs'),
+        $terminalInstallerSupportSource
+    ) `
+    -Output (Join-Path $repositoryRoot 'MBS-Terminal-Setup.exe') `
+    -Target 'winexe' `
+    -Icon (Join-Path $repositoryRoot 'assets\terminal-icons\mbs-terminal.ico')
+
+Build-Executable `
     -Source (Join-Path $repositoryRoot 'src\MbsTerminalRestore.cs') `
     -Output (Join-Path $repositoryRoot 'MBS-Terminal-Restore.exe') `
     -Target 'winexe' `

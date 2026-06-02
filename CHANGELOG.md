@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## v1.2.0 - 2026-06-02
+
+### Added
+
+- Beta graphical setup wizard asset through `MBS-Terminal-Setup.exe`.
+- Official PHP Windows zip fallback when `winget` is unavailable or cannot complete a PHP install.
+- Composer `composer.phar` fallback path when Composer setup cannot complete.
+
+### Changed
+
+- Marked `MBS-Terminal-Install.exe` as the stable, recommended release installer.
+- Marked `MBS-Terminal-Setup.exe` as beta and not stable.
+- Rebuilt release installer assets with the latest fallback and logging fixes.
+
+### Fixed
+
+- Composer fallback global package installs now run through the verified `php.exe composer.phar` runner.
+- MBS Terminal profile launch uses a process execution-policy bypass for the installed PowerShell command line.
+
 ## v1.1.0 - 2026-06-02
 
 ### Added

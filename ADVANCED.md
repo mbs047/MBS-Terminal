@@ -92,11 +92,13 @@ The full Laravel, Composer, NPM, navigation, `ls`, autocomplete, and system help
 
 ## Terminal Install
 
-For a fresh PC or when the GUI executable does not open, run the interactive terminal installer:
+For a fresh PC or normal install, run the stable interactive terminal installer:
 
 ```powershell
 .\MBS-Terminal-Install.exe
 ```
+
+`MBS-Terminal-Install.exe` is the recommended stable release asset. `MBS-Terminal-Setup.exe` is a beta graphical wizard and is not considered stable yet.
 
 You can call the PowerShell script directly from a terminal, but do not double-click it:
 
@@ -165,4 +167,4 @@ The restore script creates timestamped backups before changing anything. It rese
 .\build-installer.ps1
 ```
 
-The build uses the built-in .NET Framework C# compiler on Windows and produces `MBS-Terminal-Install.exe` and `MBS-Terminal-Restore.exe`.
+The build uses the built-in .NET Framework C# compiler on Windows and produces `MBS-Terminal-Install.exe`, `MBS-Terminal-Setup.exe`, and `MBS-Terminal-Restore.exe`.

@@ -13,7 +13,8 @@ Use GitHub issues for support requests, bug reports, and setup questions.
 
 ## Before Opening An Issue
 
-- On a fresh PC, double-click or run `.\MBS-Terminal-Install.exe` from the repository root.
+- On a fresh PC, double-click or run the stable recommended installer: `.\MBS-Terminal-Install.exe`.
+- Use `.\MBS-Terminal-Setup.exe` only if you intentionally want to try the beta graphical wizard.
 - Re-run the installer from the repository root.
 - Do not double-click `install-terminal.ps1`; Windows may open it in an editor. Run it from PowerShell only if you need script-level troubleshooting.
 - Try `.\install.ps1 -InstallDependencies` if Starship or PSReadLine is missing.

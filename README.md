@@ -13,13 +13,15 @@ MBS Terminal gives you a modern dark terminal profile, pixel avatar icons, a col
 
 ## Install
 
-Download or clone this repo, then run:
+Download the stable installer, then run:
 
 ```powershell
 .\MBS-Terminal-Install.exe
 ```
 
-The terminal installer is the recommended path on fresh PCs. It opens by double-click, installs missing requirements in sequence, and then runs the main setup script.
+`MBS-Terminal-Install.exe` is the stable, recommended installer for fresh PCs and normal installs. It opens by double-click, installs missing requirements in sequence, and then runs the main setup script.
+
+`MBS-Terminal-Setup.exe` is a beta graphical wizard. It is included for preview testing, but it is not the stable release path yet.
 
 `install-terminal.ps1` is the script behind the installer. Do not double-click it directly, because Windows may open `.ps1` files in an editor.
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Interactive terminal installer for fresh PCs, including administrator relaunch, `winget` checks, Windows Terminal installation, presets, dry-run support, and sequential handoff to `install.ps1`.
+- Command launcher for the terminal installer through `MBS-Terminal-Install.cmd`.
+
+### Fixed
+
+- Windows Terminal settings can now be created when Windows Terminal is freshly installed and has not generated `settings.json` yet.
+
 ## v1.0.0 - 2026-05-31
 
 First public release of MBS Terminal.

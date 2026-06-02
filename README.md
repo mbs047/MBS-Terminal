@@ -16,12 +16,21 @@ MBS Terminal gives you a modern dark terminal profile, pixel avatar icons, a col
 Download or clone this repo, then run:
 
 ```powershell
+.\MBS-Terminal-Install.cmd
+```
+
+The terminal installer is the recommended path on fresh PCs. It checks administrator access, installs missing requirements in sequence, and then runs the main setup script.
+
+If you prefer the GUI wizard, run:
+
+```powershell
 .\MBS-Terminal-Setup.exe
 ```
 
-The setup wizard can install or configure:
+The installers can install or configure:
 
 - Windows Terminal profile and icons.
+- Windows Terminal, when missing from a fresh PC.
 - Starship prompt.
 - PHP `8.2`, `8.3`, `8.4`, or `8.5`.
 - Existing PHP directory from Laragon, XAMPP, Herd, or a custom build.
@@ -45,9 +54,9 @@ After installation, open a new Windows Terminal tab.
 ## Requirements
 
 - Windows 10 or Windows 11.
-- Windows Terminal.
+- Windows Terminal, or `winget` so the terminal installer can install it.
 - Windows PowerShell 5.1 or later.
-- Optional: Git, PHP, Node.js, Python, Composer, and Laravel tooling.
+- Optional: Git, Node.js, Python, and extra Laravel tooling.
 
 ## Advanced Docs
 

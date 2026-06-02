@@ -90,6 +90,31 @@ The full Laravel, Composer, NPM, navigation, `ls`, autocomplete, and system help
 | `Alt+RightArrow` | Accepts the next suggestion word |
 | `Ctrl+Space` | Opens the completion menu |
 
+## Terminal Install
+
+For a fresh PC or when the GUI executable does not open, run the interactive terminal installer:
+
+```powershell
+.\MBS-Terminal-Install.cmd
+```
+
+You can also call the PowerShell script directly:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-terminal.ps1
+```
+
+Useful presets:
+
+```powershell
+.\install-terminal.ps1 -Preset Minimal
+.\install-terminal.ps1 -Preset Recommended -Yes
+.\install-terminal.ps1 -Preset Full
+.\install-terminal.ps1 -Preset Recommended -DryRun -NoAdminRelaunch
+```
+
+The terminal installer checks administrator access, verifies `winget`, installs Windows Terminal when missing, then runs `install.ps1` with the selected Starship, PHP, Composer, and Laravel tooling options.
+
 ## Script Install
 
 The GUI wraps `install.ps1`. You can also run the script directly:
@@ -114,7 +139,8 @@ Useful options:
 - Copies Starship config to `%USERPROFILE%\.config\starship.toml`.
 - Copies PowerShell helpers to `%USERPROFILE%\.config\powershell\laravel-dev.ps1`.
 - Updates the current Windows PowerShell profile to load helpers and Starship.
-- Updates Windows Terminal `settings.json` and creates a timestamped backup first.
+- Updates Windows Terminal `settings.json`, creating it when Windows Terminal is freshly installed and no settings file exists yet.
+- Creates a timestamped Windows Terminal settings backup before overwriting an existing file.
 - Optionally installs supported development tools through `winget` and Composer.
 
 ## Restore Defaults

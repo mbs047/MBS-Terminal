@@ -233,6 +233,66 @@ function Invoke-ExternalCommand {
     }
 }
 
+function Invoke-WingetInstall {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $PackageId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Description,
+
+        [switch] $Upgrade
+    )
+
+    $verb = if ($Upgrade) { 'upgrade' } else { 'install' }
+
+    $baseArguments = @(
+        $verb,
+        '--id', $PackageId,
+        '--exact',
+        '--source', 'winget',
+        '--accept-package-agreements',
+        '--accept-source-agreements'
+    )
+
+    Write-Step $Description
+
+    if ($Upgrade) {
+        & winget @baseArguments
+
+        if ($LASTEXITCODE -eq 0) {
+            Refresh-ProcessPath
+            return $true
+        }
+
+        # winget returns a non-zero code when nothing newer is available; that is not a failure.
+        return $false
+    }
+
+    # This installer always runs elevated. Installing machine-wide writes to admin-owned
+    # locations (Program Files\WinGet) and avoids the portable-package "Access is denied"
+    # (0x80070005) failure that happens with user-scope portable installs under elevation.
+    & winget @($baseArguments + @('--scope', 'machine'))
+
+    if ($LASTEXITCODE -eq 0) {
+        Refresh-ProcessPath
+        return $true
+    }
+
+    $machineExitCode = $LASTEXITCODE
+    Write-SoftWarning "$Description did not complete with machine scope (exit code $machineExitCode). Retrying with the default scope."
+
+    & winget @baseArguments
+
+    if ($LASTEXITCODE -eq 0) {
+        Refresh-ProcessPath
+        return $true
+    }
+
+    Write-SoftWarning "$Description failed with exit code $LASTEXITCODE."
+    return $false
+}
+
 function Install-PhpIfRequested {
     if (-not [string]::IsNullOrWhiteSpace($PhpDirectory)) {
         $phpExecutable = Get-PhpExecutable
@@ -252,50 +312,28 @@ function Install-PhpIfRequested {
     }
 
     $phpPackageId = Get-PhpWingetPackageId
-
-    if (Get-Command php -ErrorAction SilentlyContinue) {
-        Write-Step "PHP is already available. Ensuring PHP $PhpVersion is installed."
-
-        if ($UpdateTools -and (Get-Command winget -ErrorAction SilentlyContinue)) {
-            try {
-                $wingetArguments = @(
-                    'upgrade',
-                    '--id',
-                    $phpPackageId,
-                    '--exact',
-                    '--source',
-                    'winget',
-                    '--accept-package-agreements',
-                    '--accept-source-agreements'
-                ) + (Get-WingetScopeArguments)
-                Invoke-ExternalCommand -FilePath 'winget' -Arguments $wingetArguments -Description "Updating PHP $PhpVersion through winget."
-                Refresh-ProcessPath
-            } catch {
-                Write-SoftWarning "Could not update PHP automatically. $($_.Exception.Message)"
-            }
-        }
-    }
+    $phpAvailable = $null -ne (Get-Command php -ErrorAction SilentlyContinue)
 
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        Write-SoftWarning 'winget is not available, so PHP could not be installed automatically.'
+        if ($phpAvailable) {
+            Write-Step 'PHP is already available.'
+        } else {
+            Write-SoftWarning 'winget is not available, so PHP could not be installed automatically.'
+        }
         return
     }
 
-    try {
-        $wingetArguments = @(
-            'install',
-            '--id',
-            $phpPackageId,
-            '--exact',
-            '--source',
-            'winget',
-            '--accept-package-agreements',
-            '--accept-source-agreements'
-        ) + (Get-WingetScopeArguments)
-        Invoke-ExternalCommand -FilePath 'winget' -Arguments $wingetArguments -Description "Installing PHP $PhpVersion through winget."
-        Refresh-ProcessPath
-    } catch {
-        Write-SoftWarning "Could not install PHP automatically. $($_.Exception.Message)"
+    if ($phpAvailable) {
+        if ($UpdateTools) {
+            [void](Invoke-WingetInstall -PackageId $phpPackageId -Description "Updating PHP $PhpVersion through winget." -Upgrade)
+        } else {
+            Write-Step 'PHP is already available. Skipping PHP install.'
+        }
+        return
+    }
+
+    if (-not (Invoke-WingetInstall -PackageId $phpPackageId -Description "Installing PHP $PhpVersion through winget.")) {
+        Write-SoftWarning "Automatic PHP install failed. Re-run setup and choose 'use an existing PHP folder', or install PHP manually, then run setup again."
     }
 }
 
@@ -586,46 +624,31 @@ function Install-WingetPackageIfRequested {
         return
     }
 
+    $available = $false
+
     if (-not [string]::IsNullOrWhiteSpace($CommandName)) {
-        $existing = Get-Command $CommandName -ErrorAction SilentlyContinue
-        if ($existing) {
-            if ($UpdateTools) {
-                try {
-                    Invoke-ExternalCommand -FilePath 'winget' -Arguments @(
-                        'upgrade', '--id', $PackageId, '--exact', '--source', 'winget',
-                        '--accept-package-agreements', '--accept-source-agreements'
-                    ) -Description "Updating $Label."
-                    Refresh-ProcessPath
-                } catch {
-                    Write-SoftWarning "Could not update $Label. $($_.Exception.Message)"
-                }
-            } else {
-                Write-Step "$Label is already available."
-            }
-            return
-        }
+        $available = $null -ne (Get-Command $CommandName -ErrorAction SilentlyContinue)
     }
 
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        Write-SoftWarning "winget is not available, so $Label could not be installed automatically."
+        if ($available) {
+            Write-Step "$Label is already available."
+        } else {
+            Write-SoftWarning "winget is not available, so $Label could not be installed automatically."
+        }
         return
     }
 
-    try {
-        $wingetArguments = @(
-            'install', '--id', $PackageId, '--exact', '--source', 'winget',
-            '--accept-package-agreements', '--accept-source-agreements'
-        )
-
-        if ($ApplyScope) {
-            $wingetArguments += Get-WingetScopeArguments
+    if ($available) {
+        if ($UpdateTools) {
+            [void](Invoke-WingetInstall -PackageId $PackageId -Description "Updating $Label." -Upgrade)
+        } else {
+            Write-Step "$Label is already available."
         }
-
-        Invoke-ExternalCommand -FilePath 'winget' -Arguments $wingetArguments -Description "Installing $Label."
-        Refresh-ProcessPath
-    } catch {
-        Write-SoftWarning "Could not install $Label automatically. $($_.Exception.Message)"
+        return
     }
+
+    [void](Invoke-WingetInstall -PackageId $PackageId -Description "Installing $Label.")
 }
 
 function Install-GitIfRequested {

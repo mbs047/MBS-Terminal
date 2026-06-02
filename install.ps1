@@ -79,8 +79,9 @@ function Test-IsAdministrator {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-if (-not (Test-IsAdministrator)) {
-    throw 'MBS Terminal installer must be run as administrator.'
+if (($InstallScope -eq 'AllUsers') -and (-not (Test-IsAdministrator))) {
+    Write-SoftWarning 'An all-users install needs administrator rights. Continuing as a current-user install; PATH changes will apply to your account only.'
+    $InstallScope = 'CurrentUser'
 }
 
 function Resolve-DisplayName {
@@ -246,7 +247,7 @@ function Invoke-WingetInstall {
 
     $verb = if ($Upgrade) { 'upgrade' } else { 'install' }
 
-    $baseArguments = @(
+    $arguments = @(
         $verb,
         '--id', $PackageId,
         '--exact',
@@ -255,41 +256,27 @@ function Invoke-WingetInstall {
         '--accept-source-agreements'
     )
 
+    # Only request machine scope for an all-users install. For a per-user install we let
+    # winget use its default (user) scope, which lets it install portable packages such as
+    # PHP without elevation. winget prompts for elevation itself for packages that need it.
+    if ((-not $Upgrade) -and ($InstallScope -eq 'AllUsers')) {
+        $arguments += @('--scope', 'machine')
+    }
+
     Write-Step $Description
-
-    if ($Upgrade) {
-        & winget @baseArguments
-
-        if ($LASTEXITCODE -eq 0) {
-            Refresh-ProcessPath
-            return $true
-        }
-
-        # winget returns a non-zero code when nothing newer is available; that is not a failure.
-        return $false
-    }
-
-    # This installer always runs elevated. Installing machine-wide writes to admin-owned
-    # locations (Program Files\WinGet) and avoids the portable-package "Access is denied"
-    # (0x80070005) failure that happens with user-scope portable installs under elevation.
-    & winget @($baseArguments + @('--scope', 'machine'))
+    & winget @arguments
 
     if ($LASTEXITCODE -eq 0) {
         Refresh-ProcessPath
         return $true
     }
 
-    $machineExitCode = $LASTEXITCODE
-    Write-SoftWarning "$Description did not complete with machine scope (exit code $machineExitCode). Retrying with the default scope."
-
-    & winget @baseArguments
-
-    if ($LASTEXITCODE -eq 0) {
-        Refresh-ProcessPath
-        return $true
+    if (-not $Upgrade) {
+        # winget returns a non-zero code when nothing newer is available during an upgrade,
+        # so only treat a fresh install failure as a real problem.
+        Write-SoftWarning "$Description failed with exit code $LASTEXITCODE."
     }
 
-    Write-SoftWarning "$Description failed with exit code $LASTEXITCODE."
     return $false
 }
 

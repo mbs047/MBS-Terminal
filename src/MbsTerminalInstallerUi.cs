@@ -180,11 +180,10 @@ namespace MbsTerminalSetup
         [STAThread]
         private static int Main(string[] args)
         {
-            if (!IsAdministrator() && !HasSwitch(args, "elevated"))
-            {
-                return RelaunchAsAdministrator(args);
-            }
-
+            // The installer runs as the normal (non-elevated) user on purpose. winget
+            // installs portable packages such as PHP into the user profile and elevates
+            // individual packages itself when they need it. Running the whole installer
+            // elevated breaks winget portable installs with "Access is denied" (0x80070005).
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
@@ -226,71 +225,6 @@ namespace MbsTerminalSetup
             }
             catch
             {
-            }
-        }
-
-        private static bool IsAdministrator()
-        {
-            WindowsIdentity identity = WindowsIdentity.GetCurrent();
-            WindowsPrincipal principal = new WindowsPrincipal(identity);
-            return principal.IsInRole(WindowsBuiltInRole.Administrator);
-        }
-
-        private static bool HasSwitch(string[] args, string name)
-        {
-            foreach (string argument in args)
-            {
-                if (string.Equals(argument, "--" + name, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(argument, "-" + name, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(argument, "/" + name, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static int RelaunchAsAdministrator(string[] args)
-        {
-            try
-            {
-                List<string> relaunchArguments = new List<string>();
-                relaunchArguments.Add("--elevated");
-
-                foreach (string argument in args)
-                {
-                    relaunchArguments.Add(argument);
-                }
-
-                ProcessStartInfo startInfo = new ProcessStartInfo();
-                startInfo.FileName = typeof(Program).Assembly.Location;
-                startInfo.Arguments = string.Join(" ", relaunchArguments.ToArray());
-                startInfo.WorkingDirectory = Environment.CurrentDirectory;
-                startInfo.UseShellExecute = true;
-                startInfo.Verb = "runas";
-                Process.Start(startInfo);
-                return 0;
-            }
-            catch (System.ComponentModel.Win32Exception)
-            {
-                MessageBox.Show(
-                    "MBS Terminal Setup needs administrator rights to install developer tools and update PATH.",
-                    "MBS Terminal Setup",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
-                return 1;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    "Could not restart as administrator: " + ex.Message,
-                    "MBS Terminal Setup",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-                return 1;
             }
         }
     }

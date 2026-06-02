@@ -3,77 +3,77 @@
 add_newline = true
 command_timeout = 1000
 format = """
-[⚡ mbs](bold fg:#C099FF) $username$directory$git_branch$git_status$custom$php$nodejs$python$package$cmd_duration
+[* mbs](bold fg:#C099FF) $username$directory$git_branch$git_status$custom$php$nodejs$python$package$cmd_duration
 $character"""
 right_format = "$time"
 scan_timeout = 30
 
 [character]
-error_symbol = "[×](bold fg:#F7768E)"
-success_symbol = "[›](bold fg:#9ECE6A)"
-vimcmd_symbol = "[‹](bold fg:#7AA2F7)"
+error_symbol = "[x](bold fg:#F7768E)"
+success_symbol = "[>](bold fg:#9ECE6A)"
+vimcmd_symbol = "[<](bold fg:#7AA2F7)"
 
 [cmd_duration]
-format = "[⏱ $duration](fg:#53627A) "
+format = "[dur $duration](fg:#53627A) "
 min_time = 500
 show_milliseconds = true
 
 [custom.laravel]
 command = "echo laravel"
 detect_files = ["artisan"]
-format = "[▲ $output]($style) "
+format = "[laravel $output]($style) "
 style = "fg:#F7768E"
 
 [directory]
-format = "[📁 $path]($style)[$read_only]($read_only_style) "
+format = "[dir $path]($style)[$read_only]($read_only_style) "
 home_symbol = "~"
-read_only = " 🔒"
+read_only = " ro"
 read_only_style = "fg:#E0AF68"
 style = "bold fg:#7DCFFF"
 truncate_to_repo = false
 truncation_length = 4
 
 [git_branch]
-format = "[⑂ $branch]($style) "
+format = "[git $branch]($style) "
 style = "bold fg:#E0AF68"
 
 [git_status]
-ahead = "⇡${count}"
-behind = "⇣${count}"
-conflicted = "×"
-deleted = "−"
-diverged = "⇕${ahead_count}/${behind_count}"
+ahead = "^${count}"
+behind = "v${count}"
+conflicted = "x"
+deleted = "-"
+diverged = "<>${ahead_count}/${behind_count}"
 format = "([$all_status$ahead_behind]($style) )"
-modified = "●"
-renamed = "»"
-staged = "✓"
-stashed = "≡"
+modified = "*"
+renamed = ">"
+staged = "+"
+stashed = "="
 style = "fg:#F7768E"
 untracked = "?"
 
 [nodejs]
-format = "[⬢ node]($style) "
+format = "[node]($style) "
 style = "fg:#9ECE6A"
 
 [package]
-format = "[◇ pkg $version]($style) "
+format = "[pkg $version]($style) "
 style = "fg:#C099FF"
 
 [php]
-format = "[🐘 php]($style) "
+format = "[php]($style) "
 style = "fg:#7AA2F7"
 
 [python]
-format = "[🐍 py]($style) "
+format = "[py]($style) "
 style = "fg:#9ECE6A"
 
 [time]
 disabled = false
-format = "[🕒 $time]($style)"
+format = "[time $time]($style)"
 style = "fg:#53627A"
 time_format = "%H:%M"
 
 [username]
-format = "[◆ __MBS_DISPLAY_NAME__]($style) "
+format = "[user __MBS_DISPLAY_NAME__]($style) "
 show_always = true
 style_user = "bold fg:#D6DEEB"

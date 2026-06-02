@@ -8,32 +8,32 @@ For the complete command list, see [CUSTOM_COMMANDS.md](CUSTOM_COMMANDS.md).
 
 | Icon | Segment | Color | Meaning |
 | --- | --- | --- | --- |
-| `⚡` | `mbs` | `#C099FF` | MBS prompt brand mark |
-| `◆` | username | `#D6DEEB` | Display name from the installer or Windows user |
-| `📁` | directory | `#7DCFFF` | Current working directory |
-| `⑂` | Git branch | `#E0AF68` | Current branch name |
-| `▲` | Laravel | `#F7768E` | Appears when an `artisan` file is detected |
-| `🐘` | PHP | `#7AA2F7` | PHP context |
-| `⬢` | Node | `#9ECE6A` | Node.js context |
-| `◇` | package | `#C099FF` | Package version context |
-| `🐍` | Python | `#9ECE6A` | Python context |
-| `⏱` | duration | `#53627A` | Long-running command duration |
-| `🕒` | time | `#53627A` | Right-aligned clock |
-| `›` / `×` | prompt | green / red | Success or error prompt marker |
+| `*` | `mbs` | `#C099FF` | MBS prompt brand mark |
+| `user` | username | `#D6DEEB` | Display name from the installer or Windows user |
+| `dir` | directory | `#7DCFFF` | Current working directory |
+| `git` | Git branch | `#E0AF68` | Current branch name |
+| `laravel` | Laravel | `#F7768E` | Appears when an `artisan` file is detected |
+| `php` | PHP | `#7AA2F7` | PHP context |
+| `node` | Node | `#9ECE6A` | Node.js context |
+| `pkg` | package | `#C099FF` | Package version context |
+| `py` | Python | `#9ECE6A` | Python context |
+| `dur` | duration | `#53627A` | Long-running command duration |
+| `time` | time | `#53627A` | Right-aligned clock |
+| `>` / `x` | prompt | green / red | Success or error prompt marker |
 
 ## Git Status Marks
 
 | Mark | Meaning |
 | --- | --- |
-| `⇡` | Ahead of remote |
-| `⇣` | Behind remote |
-| `⇕` | Diverged from remote |
-| `×` | Conflict |
-| `−` | Deleted file |
-| `●` | Modified file |
-| `»` | Renamed file |
-| `✓` | Staged file |
-| `≡` | Stashed changes |
+| `^` | Ahead of remote |
+| `v` | Behind remote |
+| `<>` | Diverged from remote |
+| `x` | Conflict |
+| `-` | Deleted file |
+| `*` | Modified file |
+| `>` | Renamed file |
+| `+` | Staged file |
+| `=` | Stashed changes |
 | `?` | Untracked file |
 
 ## MBS Midnight Palette
@@ -117,7 +117,7 @@ The terminal installer checks administrator access, verifies `winget`, installs 
 
 ## Script Install
 
-The GUI wraps `install.ps1`. You can also run the script directly:
+The executable installer wraps `install.ps1`. You can also run the script directly:
 
 ```powershell
 .\install.ps1 -InstallDependencies -InstallPhp -PhpVersion 8.4 -InstallComposer -InstallLaravel

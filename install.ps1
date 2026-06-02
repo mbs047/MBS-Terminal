@@ -11,6 +11,22 @@ param(
     [switch] $InstallPint,
     [switch] $InstallEnvoy,
     [switch] $InstallVapor,
+    [switch] $InstallGit,
+    [switch] $InstallNode,
+    [switch] $InstallNvm,
+    [switch] $InstallGhCli,
+    [switch] $InstallPest,
+    [switch] $InstallLarastan,
+    [switch] $InstallRector,
+    [switch] $InstallRay,
+    [switch] $InstallMkcert,
+    [switch] $InstallRedis,
+    [switch] $InstallDocker,
+    [switch] $InstallTablePlus,
+    [switch] $InstallFzf,
+    [switch] $InstallBat,
+    [switch] $InstallRipgrep,
+    [switch] $InstallLazygit,
     [switch] $UpdateTools,
     [ValidateSet('CurrentUser', 'AllUsers')]
     [string] $InstallScope = 'CurrentUser',
@@ -557,6 +573,165 @@ function Install-VaporIfRequested {
     [void](Install-ComposerGlobalPackage -PackageName 'laravel/vapor-cli' -Label 'Laravel Vapor CLI')
 }
 
+function Install-WingetPackageIfRequested {
+    param(
+        [bool] $Requested,
+        [string] $PackageId,
+        [string] $Label,
+        [string] $CommandName = '',
+        [bool] $ApplyScope = $true
+    )
+
+    if (-not $Requested) {
+        return
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($CommandName)) {
+        $existing = Get-Command $CommandName -ErrorAction SilentlyContinue
+        if ($existing) {
+            if ($UpdateTools) {
+                try {
+                    Invoke-ExternalCommand -FilePath 'winget' -Arguments @(
+                        'upgrade', '--id', $PackageId, '--exact', '--source', 'winget',
+                        '--accept-package-agreements', '--accept-source-agreements'
+                    ) -Description "Updating $Label."
+                    Refresh-ProcessPath
+                } catch {
+                    Write-SoftWarning "Could not update $Label. $($_.Exception.Message)"
+                }
+            } else {
+                Write-Step "$Label is already available."
+            }
+            return
+        }
+    }
+
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        Write-SoftWarning "winget is not available, so $Label could not be installed automatically."
+        return
+    }
+
+    try {
+        $wingetArguments = @(
+            'install', '--id', $PackageId, '--exact', '--source', 'winget',
+            '--accept-package-agreements', '--accept-source-agreements'
+        )
+
+        if ($ApplyScope) {
+            $wingetArguments += Get-WingetScopeArguments
+        }
+
+        Invoke-ExternalCommand -FilePath 'winget' -Arguments $wingetArguments -Description "Installing $Label."
+        Refresh-ProcessPath
+    } catch {
+        Write-SoftWarning "Could not install $Label automatically. $($_.Exception.Message)"
+    }
+}
+
+function Install-GitIfRequested {
+    Install-WingetPackageIfRequested -Requested $InstallGit -PackageId 'Git.Git' -Label 'Git' -CommandName 'git'
+}
+
+function Install-NodeIfRequested {
+    if ($InstallNvm) {
+        Install-WingetPackageIfRequested -Requested $true -PackageId 'CoreyButler.NVMforWindows' -Label 'nvm-windows'
+        Write-SoftWarning 'nvm-windows installed. Open a new terminal and run: nvm install lts && nvm use lts'
+        return
+    }
+
+    Install-WingetPackageIfRequested -Requested $InstallNode -PackageId 'OpenJS.NodeJS.LTS' -Label 'Node.js LTS' -CommandName 'node'
+}
+
+function Install-GhCliIfRequested {
+    Install-WingetPackageIfRequested -Requested $InstallGhCli -PackageId 'GitHub.cli' -Label 'GitHub CLI' -CommandName 'gh'
+}
+
+function Install-PestIfRequested {
+    if (-not $InstallPest) {
+        return
+    }
+
+    [void](Install-ComposerGlobalPackage -PackageName 'pestphp/pest' -Label 'Pest PHP')
+}
+
+function Install-LarastanIfRequested {
+    if (-not $InstallLarastan) {
+        return
+    }
+
+    [void](Install-ComposerGlobalPackage -PackageName 'larastan/larastan' -Label 'Larastan')
+}
+
+function Install-RectorIfRequested {
+    if (-not $InstallRector) {
+        return
+    }
+
+    [void](Install-ComposerGlobalPackage -PackageName 'rector/rector' -Label 'Rector')
+}
+
+function Install-RayIfRequested {
+    if (-not $InstallRay) {
+        return
+    }
+
+    [void](Install-ComposerGlobalPackage -PackageName 'spatie/ray' -Label 'Ray (spatie/ray)')
+}
+
+function Install-MkcertIfRequested {
+    if (-not $InstallMkcert) {
+        return
+    }
+
+    Install-WingetPackageIfRequested -Requested $true -PackageId 'FiloSottile.mkcert' -Label 'mkcert' -CommandName 'mkcert'
+
+    $mkcert = Get-Command mkcert -ErrorAction SilentlyContinue
+
+    if (-not $mkcert) {
+        Write-SoftWarning 'mkcert was not found after install. Open a new terminal and run: mkcert -install'
+        return
+    }
+
+    try {
+        Invoke-ExternalCommand -FilePath $mkcert.Source -Arguments @('-install') -Description 'Trusting mkcert local certificate authority.'
+    } catch {
+        Write-SoftWarning "mkcert was installed but could not trust the local CA. Run manually: mkcert -install. $($_.Exception.Message)"
+    }
+}
+
+function Install-RedisIfRequested {
+    Install-WingetPackageIfRequested -Requested $InstallRedis -PackageId 'Memurai.Memurai' -Label 'Memurai (Redis-compatible)' -ApplyScope $false
+}
+
+function Install-DockerIfRequested {
+    if (-not $InstallDocker) {
+        return
+    }
+
+    Write-SoftWarning 'Docker Desktop requires WSL2 or Hyper-V and a system restart. Ensure these prerequisites are enabled.'
+    Install-WingetPackageIfRequested -Requested $true -PackageId 'Docker.DockerDesktop' -Label 'Docker Desktop' -CommandName 'docker' -ApplyScope $false
+}
+
+function Install-TablePlusIfRequested {
+    Install-WingetPackageIfRequested -Requested $InstallTablePlus -PackageId 'TablePlus.TablePlus' -Label 'TablePlus' -ApplyScope $false
+}
+
+function Install-FzfIfRequested {
+    Install-WingetPackageIfRequested -Requested $InstallFzf -PackageId 'junegunn.fzf' -Label 'fzf' -CommandName 'fzf'
+}
+
+function Install-BatIfRequested {
+    Install-WingetPackageIfRequested -Requested $InstallBat -PackageId 'sharkdp.bat' -Label 'bat' -CommandName 'bat'
+}
+
+function Install-RipgrepIfRequested {
+    Install-WingetPackageIfRequested -Requested $InstallRipgrep -PackageId 'BurntSushi.ripgrep.MSVC' -Label 'ripgrep' -CommandName 'rg'
+}
+
+function Install-LazygitIfRequested {
+    Install-WingetPackageIfRequested -Requested $InstallLazygit -PackageId 'JesseDuffield.lazygit' -Label 'lazygit' -CommandName 'lazygit'
+}
+
 function Install-PSReadLineIfPossible {
     if (-not (Get-Command Install-Module -ErrorAction SilentlyContinue)) {
         Write-SoftWarning 'Install-Module is not available, skipping PSReadLine update.'
@@ -813,6 +988,21 @@ Install-ValetIfRequested
 Install-PintIfRequested
 Install-EnvoyIfRequested
 Install-VaporIfRequested
+Install-GitIfRequested
+Install-NodeIfRequested
+Install-GhCliIfRequested
+Install-PestIfRequested
+Install-LarastanIfRequested
+Install-RectorIfRequested
+Install-RayIfRequested
+Install-MkcertIfRequested
+Install-RedisIfRequested
+Install-DockerIfRequested
+Install-TablePlusIfRequested
+Install-FzfIfRequested
+Install-BatIfRequested
+Install-RipgrepIfRequested
+Install-LazygitIfRequested
 Install-PSReadLineIfPossible
 
 Write-Step 'Done. Open a new Windows Terminal tab to see the setup.'

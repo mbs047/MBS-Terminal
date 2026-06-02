@@ -4,7 +4,16 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
+using System.Reflection;
 using System.Windows.Forms;
+
+[assembly: AssemblyProduct("MBS Terminal")]
+[assembly: AssemblyTitle("MBS Terminal Restore")]
+[assembly: AssemblyDescription("Restores Windows Terminal and shell files to a clean default state.")]
+[assembly: AssemblyCompany("MBS Dev")]
+[assembly: AssemblyCopyright("Copyright 2026 MBS Dev")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
 
 namespace MbsTerminalRestore
 {

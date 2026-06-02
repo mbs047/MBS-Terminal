@@ -413,25 +413,25 @@ function New-InstallPlan {
         InstallComposer        = $true
         InstallLaravel         = $true
         InstallValet           = $false
-        InstallPint            = $true
+        InstallPint            = $false
         InstallEnvoy           = $false
         InstallVapor           = $false
         UpdateTools            = $false
-        InstallGit             = $true
-        InstallNode            = $true
+        InstallGit             = $false
+        InstallNode            = $false
         InstallNvm             = $false
-        InstallGhCli           = $true
-        InstallPest            = $true
-        InstallLarastan        = $true
+        InstallGhCli           = $false
+        InstallPest            = $false
+        InstallLarastan        = $false
         InstallRector          = $false
         InstallRay             = $false
-        InstallMkcert          = $true
+        InstallMkcert          = $false
         InstallRedis           = $false
         InstallDocker          = $false
-        InstallTablePlus       = $true
-        InstallFzf             = $true
-        InstallBat             = $true
-        InstallRipgrep         = $true
+        InstallTablePlus       = $false
+        InstallFzf             = $false
+        InstallBat             = $false
+        InstallRipgrep         = $false
         InstallLazygit         = $false
     }
 
@@ -511,44 +511,44 @@ function Read-InstallPlan {
     $plan.InstallComposer = Ask-YesNo -Question 'Install Composer?' -Default $true
 
     Write-Step 'Choose Laravel tooling.'
-    Write-Help 'Recommended installs Laravel Installer and Pint. Valet, Envoy, and Vapor are useful but more specialized.'
+    Write-Help 'Laravel Installer stays enabled by default. Pint, Valet, Envoy, and Vapor are optional extras.'
     $plan.InstallLaravel = Ask-YesNo -Question 'Install Laravel Installer?' -Default $true
     $plan.InstallValet = Ask-YesNo -Question 'Install Valet for Windows?' -Default $false
-    $plan.InstallPint = Ask-YesNo -Question 'Install Laravel Pint?' -Default $true
+    $plan.InstallPint = Ask-YesNo -Question 'Install Laravel Pint?' -Default $false
     $plan.InstallEnvoy = Ask-YesNo -Question 'Install Laravel Envoy?' -Default $false
     $plan.InstallVapor = Ask-YesNo -Question 'Install Laravel Vapor CLI?' -Default $false
     $plan.UpdateTools = Ask-YesNo -Question 'Update existing tools while installing?' -Default $false
 
     Write-Step 'Choose system tools.'
     Write-Help 'Git is needed for version control. Node.js LTS is needed for Vite and npm scripts.'
-    $plan.InstallGit = Ask-YesNo -Question 'Install Git when missing?' -Default $true
-    $plan.InstallNode = Ask-YesNo -Question 'Install Node.js LTS when missing?' -Default $true
+    $plan.InstallGit = Ask-YesNo -Question 'Install Git when missing?' -Default $false
+    $plan.InstallNode = Ask-YesNo -Question 'Install Node.js LTS when missing?' -Default $false
 
     if (-not $plan.InstallNode) {
         $plan.InstallNvm = Ask-YesNo -Question 'Install nvm-windows to manage Node versions instead?' -Default $false
     }
 
-    $plan.InstallGhCli = Ask-YesNo -Question 'Install GitHub CLI (gh)?' -Default $true
+    $plan.InstallGhCli = Ask-YesNo -Question 'Install GitHub CLI (gh)?' -Default $false
 
     Write-Step 'Choose code quality tools.'
     Write-Help 'These install globally via Composer. Larastan = PHPStan with Laravel-aware rules.'
-    $plan.InstallPest = Ask-YesNo -Question 'Install Pest PHP globally?' -Default $true
-    $plan.InstallLarastan = Ask-YesNo -Question 'Install Larastan (PHPStan for Laravel)?' -Default $true
+    $plan.InstallPest = Ask-YesNo -Question 'Install Pest PHP globally?' -Default $false
+    $plan.InstallLarastan = Ask-YesNo -Question 'Install Larastan (PHPStan for Laravel)?' -Default $false
     $plan.InstallRector = Ask-YesNo -Question 'Install Rector (automated PHP refactoring)?' -Default $false
     $plan.InstallRay = Ask-YesNo -Question 'Install Ray debug helper (spatie/ray)?' -Default $false
 
     Write-Step 'Choose local environment tools.'
     Write-Help 'mkcert sets up trusted local HTTPS. Memurai runs Redis locally for queues and cache.'
-    $plan.InstallMkcert = Ask-YesNo -Question 'Install mkcert (local HTTPS certificates)?' -Default $true
+    $plan.InstallMkcert = Ask-YesNo -Question 'Install mkcert (local HTTPS certificates)?' -Default $false
     $plan.InstallRedis = Ask-YesNo -Question 'Install Memurai (Redis-compatible server)?' -Default $false
     $plan.InstallDocker = Ask-YesNo -Question 'Install Docker Desktop (for Laravel Sail)?' -Default $false
-    $plan.InstallTablePlus = Ask-YesNo -Question 'Install TablePlus (database GUI)?' -Default $true
+    $plan.InstallTablePlus = Ask-YesNo -Question 'Install TablePlus (database GUI)?' -Default $false
 
     Write-Step 'Choose terminal productivity tools.'
     Write-Help 'Small utilities that make the terminal faster: fuzzy find, colourised output, fast search, git UI.'
-    $plan.InstallFzf = Ask-YesNo -Question 'Install fzf (fuzzy finder)?' -Default $true
-    $plan.InstallBat = Ask-YesNo -Question 'Install bat (syntax-highlighted cat)?' -Default $true
-    $plan.InstallRipgrep = Ask-YesNo -Question 'Install ripgrep (fast grep)?' -Default $true
+    $plan.InstallFzf = Ask-YesNo -Question 'Install fzf (fuzzy finder)?' -Default $false
+    $plan.InstallBat = Ask-YesNo -Question 'Install bat (syntax-highlighted cat)?' -Default $false
+    $plan.InstallRipgrep = Ask-YesNo -Question 'Install ripgrep (fast grep)?' -Default $false
     $plan.InstallLazygit = Ask-YesNo -Question 'Install lazygit (terminal git UI)?' -Default $false
 
     return $plan

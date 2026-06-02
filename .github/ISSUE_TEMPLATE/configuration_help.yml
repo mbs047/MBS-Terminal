@@ -27,7 +27,7 @@ body:
     attributes:
       label: Windows version
       description: Include the edition/build if you know it. Use "Not sure" if needed.
-      placeholder: Windows 11 23H2 or Not sure
+      value: Windows 11 23H2
     validations:
       required: true
   - type: input
@@ -35,17 +35,20 @@ body:
     attributes:
       label: Command you ran
       description: Include the exact command, installer option, or terminal action.
-      placeholder: .\install.ps1 -InstallDependencies
+      value: .\install.ps1 -InstallDependencies
     validations:
       required: true
   - type: textarea
     id: problem
     attributes:
       label: What do you need help with?
-      placeholder: |
+      value: |
         What you are trying to set up:
+
         What happened:
+
         What you expected:
+
         What you already tried:
     validations:
       required: true
@@ -54,8 +57,11 @@ body:
     attributes:
       label: Output or screenshot
       description: Paste safe command output or attach screenshots.
-      placeholder: |
-        Paste the command and safe output here.
+      value: |
+        # Command
+        .\install.ps1 -InstallDependencies
+
+        # Safe output or screenshot notes
         Include the exact error line or attach a screenshot if this is visual.
       render: shell
   - type: checkboxes

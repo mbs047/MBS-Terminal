@@ -9,9 +9,11 @@ body:
     attributes:
       label: Problem
       description: What workflow or pain point should this improve?
-      placeholder: |
+      value: |
         I want MBS Terminal to...
+
         Today I have to...
+
         This matters because...
     validations:
       required: true
@@ -20,9 +22,11 @@ body:
     attributes:
       label: Proposed solution
       description: Describe the behavior you would like.
-      placeholder: |
+      value: |
         Add support for...
+
         It should work when...
+
         Mention any command, installer option, prompt segment, config file, or UI behavior.
     validations:
       required: true
@@ -30,9 +34,11 @@ body:
     id: alternatives
     attributes:
       label: Alternatives considered
-      placeholder: |
+      value: |
         I tried...
+
         A workaround is...
+
         This is not enough because...
   - type: dropdown
     id: area

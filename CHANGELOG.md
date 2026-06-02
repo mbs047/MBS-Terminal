@@ -2,11 +2,18 @@
 
 ## Unreleased
 
+## v1.1.0 - 2026-06-02
+
 ### Added
 
 - Interactive terminal installer for fresh PCs, including administrator relaunch, `winget` checks, Windows Terminal installation, presets, dry-run support, and sequential handoff to `install.ps1`.
 - Double-clickable terminal installer through `MBS-Terminal-Install.exe`.
 - Richer terminal installer output with status badges, helper messages, clear sections, and final success, warning, canceled, or failed states.
+- Optional installer support for Git, Node.js LTS, nvm-windows, GitHub CLI, Pest PHP, Larastan, Rector, Ray, mkcert, Memurai (Redis), Docker Desktop, TablePlus, fzf, bat, ripgrep, and lazygit.
+
+### Changed
+
+- Optional extra tools now default to `No` unless explicitly selected.
 
 ### Fixed
 

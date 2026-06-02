@@ -183,6 +183,13 @@ function Restore-UserConfigFiles {
         Write-Step "Moved MBS PowerShell helper to backup: $helperBackup"
     }
 
+    $profilePathFile = Join-Path $HOME '.config\powershell\mbs-terminal-paths.txt'
+    $profilePathBackup = Move-FileToBackup -Path $profilePathFile -Timestamp $Timestamp
+
+    if ($profilePathBackup) {
+        Write-Step "Moved MBS profile PATH fallback to backup: $profilePathBackup"
+    }
+
     if (-not $KeepStarship) {
         $starshipPath = Join-Path $HOME '.config\starship.toml'
         $starshipBackup = Move-FileToBackup -Path $starshipPath -Timestamp $Timestamp

@@ -115,6 +115,10 @@ function Get-EnvironmentTarget {
     return 'User'
 }
 
+function Get-MbsProfilePathFile {
+    return Join-Path $HOME '.config\powershell\mbs-terminal-paths.txt'
+}
+
 function Get-PathEntries {
     param([string[]] $PathValues)
 
@@ -139,6 +143,38 @@ function Get-PathEntries {
     }
 
     return $entries.ToArray()
+}
+
+function Add-MbsProfilePathEntry {
+    param([string] $ResolvedDirectory)
+
+    try {
+        $pathFile = Get-MbsProfilePathFile
+        $pathDirectory = Split-Path -Path $pathFile -Parent
+
+        if (-not (Test-Path -LiteralPath $pathDirectory)) {
+            New-Item -ItemType Directory -Path $pathDirectory | Out-Null
+        }
+
+        $entries = @()
+
+        if (Test-Path -LiteralPath $pathFile) {
+            $entries = Get-Content -LiteralPath $pathFile | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        }
+
+        $hasEntry = $entries | Where-Object { $_.TrimEnd('\') -ieq $ResolvedDirectory.TrimEnd('\') } | Select-Object -First 1
+
+        if (-not $hasEntry) {
+            $entries = @($entries) + $ResolvedDirectory
+            Set-Content -LiteralPath $pathFile -Value ($entries -join [Environment]::NewLine) -Encoding ASCII
+            Write-Step "Added to MBS Terminal profile PATH fallback: $ResolvedDirectory"
+        }
+
+        return $true
+    } catch {
+        Write-SoftWarning "Could not update the MBS Terminal profile PATH fallback. $($_.Exception.Message)"
+        return $false
+    }
 }
 
 function Set-PersistentPathVariable {
@@ -248,6 +284,11 @@ function Add-PathEntry {
             if ($pathTarget -eq 'Machine') {
                 Write-SoftWarning "Could not add to machine PATH. Falling back to user PATH for: $resolvedDirectory. $($_.Exception.Message)"
                 continue
+            }
+
+            if (Add-MbsProfilePathEntry -ResolvedDirectory $resolvedDirectory) {
+                Write-SoftWarning "Could not save Windows user PATH. MBS Terminal will load this path from the PowerShell profile: $resolvedDirectory"
+                return
             }
 
             Write-SoftWarning "Could not save PATH permanently. This installer can still use: $resolvedDirectory. $($_.Exception.Message)"
@@ -579,6 +620,24 @@ function Get-ComposerGlobalBin {
     return Join-Path $env:APPDATA 'Composer\vendor\bin'
 }
 
+function Get-ComposerBackupInstallDirectory {
+    $baseDirectory = ''
+
+    if ($InstallScope -eq 'AllUsers' -and (Test-IsAdministrator) -and -not [string]::IsNullOrWhiteSpace($env:ProgramData)) {
+        $baseDirectory = Join-Path $env:ProgramData 'MBS-Terminal\Composer'
+    } else {
+        $localAppData = $env:LOCALAPPDATA
+
+        if ([string]::IsNullOrWhiteSpace($localAppData)) {
+            $localAppData = Join-Path $HOME 'AppData\Local'
+        }
+
+        $baseDirectory = Join-Path $localAppData 'MBS-Terminal\Composer'
+    }
+
+    return $baseDirectory
+}
+
 function Get-ValetComposerHome {
     return Join-Path $env:APPDATA 'Composer\mbs-valet'
 }
@@ -653,6 +712,117 @@ function Invoke-WingetInstall {
     }
 
     return $false
+}
+
+function Test-ComposerCommand {
+    param([string] $ComposerCommand = '')
+
+    if ([string]::IsNullOrWhiteSpace($ComposerCommand)) {
+        $command = Get-Command composer -ErrorAction SilentlyContinue
+
+        if (-not $command) {
+            return $false
+        }
+
+        $ComposerCommand = $command.Source
+    }
+
+    if (-not (Test-Path -LiteralPath $ComposerCommand)) {
+        return $false
+    }
+
+    $previousErrorActionPreference = $ErrorActionPreference
+
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = @(& $ComposerCommand --version --no-ansi 2>&1)
+        $exitCode = $LASTEXITCODE
+
+        if ($exitCode -eq 0) {
+            $firstLine = $output | Select-Object -First 1
+
+            if (-not [string]::IsNullOrWhiteSpace($firstLine)) {
+                Write-Step $firstLine
+            }
+
+            return $true
+        }
+
+        Write-SoftWarning "composer was found but did not run correctly (exit code $exitCode)."
+    } catch {
+        Write-SoftWarning "composer was found but could not start. $($_.Exception.Message)"
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    return $false
+}
+
+function New-ComposerCommandWrappers {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $InstallDirectory,
+
+        [Parameter(Mandatory = $true)]
+        [string] $PhpExecutable
+    )
+
+    $batchPath = Join-Path $InstallDirectory 'composer.bat'
+    $powershellPath = Join-Path $InstallDirectory 'composer.ps1'
+    $escapedPhpForPowerShell = $PhpExecutable.Replace("'", "''")
+
+    $batchContent = @(
+        '@ECHO OFF',
+        'SETLOCAL',
+        ('CALL "{0}" "%~dp0composer.phar" %*' -f $PhpExecutable),
+        'EXIT /B %ERRORLEVEL%'
+    )
+
+    $powershellContent = @(
+        ('$php = ''{0}''' -f $escapedPhpForPowerShell),
+        '$composer = Join-Path $PSScriptRoot ''composer.phar''',
+        '& $php $composer @args',
+        'exit $LASTEXITCODE'
+    )
+
+    Set-Content -LiteralPath $batchPath -Value ($batchContent -join [Environment]::NewLine) -Encoding ASCII
+    Set-Content -LiteralPath $powershellPath -Value ($powershellContent -join [Environment]::NewLine) -Encoding ASCII
+}
+
+function Install-ComposerFromPhar {
+    param([string] $PhpExecutable)
+
+    if ([string]::IsNullOrWhiteSpace($PhpExecutable) -or -not (Test-Path -LiteralPath $PhpExecutable)) {
+        Write-SoftWarning 'Composer phar backup needs a working PHP executable first.'
+        return $false
+    }
+
+    $installDirectory = Get-ComposerBackupInstallDirectory
+    $composerPhar = Join-Path $installDirectory 'composer.phar'
+    $composerCommand = Join-Path $installDirectory 'composer.bat'
+
+    try {
+        if (-not (Test-Path -LiteralPath $installDirectory)) {
+            New-Item -ItemType Directory -Path $installDirectory | Out-Null
+        }
+
+        Write-Step 'Installing Composer from composer.phar backup.'
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri 'https://getcomposer.org/download/latest-stable/composer.phar' -OutFile $composerPhar -UseBasicParsing
+        New-ComposerCommandWrappers -InstallDirectory $installDirectory -PhpExecutable $PhpExecutable
+        Add-PathEntry -Directory $installDirectory
+        Refresh-ProcessPath
+
+        if (Test-ComposerCommand -ComposerCommand $composerCommand) {
+            Write-Step "Composer installed from phar backup: $installDirectory"
+            return $true
+        }
+
+        return $false
+    } catch {
+        Write-SoftWarning "Composer phar backup failed. $($_.Exception.Message)"
+        return $false
+    }
 }
 
 function Install-PhpIfRequested {
@@ -744,8 +914,11 @@ function Install-ComposerIfRequested {
 
     $setupPath = Join-Path $env:TEMP 'Composer-Setup.exe'
 
+    $composerSetupSucceeded = $false
+
     try {
         Write-Step 'Downloading Composer setup.'
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         Invoke-WebRequest -Uri 'https://getcomposer.org/Composer-Setup.exe' -OutFile $setupPath -UseBasicParsing
 
         $setupArguments = @(
@@ -773,16 +946,27 @@ function Install-ComposerIfRequested {
 
         if (Get-Command composer -ErrorAction SilentlyContinue) {
             Write-Step 'Composer installed.'
-        } else {
-            Write-SoftWarning 'Composer setup finished, but composer was not found in this process PATH yet. Open a new terminal and try again.'
+            $composerSetupSucceeded = $true
         }
     } catch {
-        Write-SoftWarning "Could not install Composer automatically. $($_.Exception.Message)"
+        Write-SoftWarning "Composer setup did not complete. $($_.Exception.Message)"
     } finally {
         if (Test-Path -LiteralPath $setupPath) {
             Remove-Item -LiteralPath $setupPath -Force
         }
     }
+
+    if ($composerSetupSucceeded) {
+        return
+    }
+
+    Write-SoftWarning 'Trying the Composer phar backup.'
+
+    if (Install-ComposerFromPhar -PhpExecutable $phpExecutable) {
+        return
+    }
+
+    Write-SoftWarning 'Could not install Composer automatically. Laravel Installer needs Composer first.'
 }
 
 function Install-ComposerGlobalPackage {

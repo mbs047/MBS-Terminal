@@ -37,6 +37,11 @@ function Test-IsAdministrator {
 }
 
 $script:PathWriteTargets = New-Object System.Collections.Generic.List[string]
+$script:ProfilePathFile = ''
+
+function Get-MbsProfilePathFile {
+    return $script:ProfilePathFile
+}
 
 function Set-PersistentPathVariable {
     param(
@@ -50,11 +55,7 @@ function Set-PersistentPathVariable {
 
     [void] $script:PathWriteTargets.Add($Target)
 
-    if ($Target -eq 'Machine') {
-        throw [System.UnauthorizedAccessException]::new('Simulated blocked machine PATH write.')
-    }
-
-    Write-Host "[PERSIST-$Target] PATH would include test directory."
+    throw [System.UnauthorizedAccessException]::new("Simulated blocked $Target PATH write.")
 }
 
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ('MBS-Terminal-PathFallbackTest-' + [Guid]::NewGuid().ToString('N'))
@@ -63,6 +64,7 @@ $oldPath = $env:Path
 try {
     New-Item -ItemType Directory -Path $tempRoot | Out-Null
     $script:InstallScope = 'AllUsers'
+    $script:ProfilePathFile = Join-Path $tempRoot 'mbs-terminal-paths.txt'
     $env:Path = "$env:SystemRoot\System32"
 
     Add-PathEntry -Directory $tempRoot
@@ -73,6 +75,17 @@ try {
 
     if (-not ($script:PathWriteTargets -contains 'User')) {
         throw 'User PATH fallback was not attempted after machine PATH was blocked.'
+    }
+
+    if (-not (Test-Path -LiteralPath $script:ProfilePathFile)) {
+        throw 'Profile PATH fallback file was not created after user PATH was blocked.'
+    }
+
+    $profilePathEntries = Get-Content -LiteralPath $script:ProfilePathFile
+    $hasProfileEntry = $profilePathEntries | Where-Object { $_.TrimEnd('\') -ieq $tempRoot.TrimEnd('\') } | Select-Object -First 1
+
+    if (-not $hasProfileEntry) {
+        throw 'Profile PATH fallback file does not contain the directory.'
     }
 
     $processPathEntries = Get-PathEntries -PathValues @($env:Path)
@@ -90,7 +103,7 @@ try {
         throw 'Refresh-ProcessPath removed the process PATH entry.'
     }
 
-    Write-Host "PASS machine PATH failure fell back to user PATH and preserved process PATH: $tempRoot"
+    Write-Host "PASS blocked PATH writes fell back to profile PATH and preserved process PATH: $tempRoot"
 } finally {
     $env:Path = $oldPath
 

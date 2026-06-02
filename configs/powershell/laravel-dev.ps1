@@ -4,6 +4,38 @@ $script:LaravelArtisanCommandCache = @{}
 $script:ComposerScriptsCache = @{}
 $script:NpmScriptsCache = @{}
 
+function Add-MbsTerminalProfilePathEntries {
+    $pathFile = Join-Path $HOME '.config\powershell\mbs-terminal-paths.txt'
+
+    if (-not (Test-Path -LiteralPath $pathFile)) {
+        return
+    }
+
+    try {
+        $entries = Get-Content -LiteralPath $pathFile | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        $currentEntries = @($env:Path -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+
+        foreach ($entry in $entries) {
+            $expandedEntry = [Environment]::ExpandEnvironmentVariables($entry)
+
+            if ([string]::IsNullOrWhiteSpace($expandedEntry) -or -not (Test-Path -LiteralPath $expandedEntry)) {
+                continue
+            }
+
+            $hasEntry = $currentEntries | Where-Object { $_.TrimEnd('\') -ieq $expandedEntry.TrimEnd('\') } | Select-Object -First 1
+
+            if (-not $hasEntry) {
+                $currentEntries = @($expandedEntry) + $currentEntries
+            }
+        }
+
+        $env:Path = $currentEntries -join ';'
+    } catch {
+    }
+}
+
+Add-MbsTerminalProfilePathEntries
+
 try {
     $script:MbsUtf8Encoding = [System.Text.UTF8Encoding]::new($false)
     [Console]::InputEncoding = $script:MbsUtf8Encoding

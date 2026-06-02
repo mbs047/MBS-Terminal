@@ -1471,7 +1471,7 @@ function Install-WindowsTerminalSettings {
             '{61c54bbd-c2c6-5271-96e7-009a87ff44bf}' {
                 $profile.icon = $devIcon
                 $profile.startingDirectory = $StartingDirectory
-                $profile.commandline = '%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo'
+                $profile.commandline = '%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -ExecutionPolicy Bypass'
             }
             '{0caa0dad-35be-5f56-a8ff-afceeeaa6101}' {
                 $profile.icon = $cmdIcon

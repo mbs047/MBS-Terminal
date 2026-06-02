@@ -678,13 +678,7 @@ function Install-WindowsTerminalSettings {
         [string] $StartingDirectory
     )
 
-    $settingsCandidates = @(
-        (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'),
-        (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json'),
-        (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json')
-    )
-
-    $settingsPath = $settingsCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    $settingsPath = Resolve-WindowsTerminalSettingsPath
 
     if (-not $settingsPath) {
         Write-SoftWarning 'Windows Terminal settings.json was not found. Install Windows Terminal first, then run this installer again.'
@@ -697,8 +691,12 @@ function Install-WindowsTerminalSettings {
         New-Item -ItemType Directory -Path $settingsDirectory | Out-Null
     }
 
-    $backupPath = "$settingsPath.bak-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
-    Copy-Item -LiteralPath $settingsPath -Destination $backupPath -Force
+    $backupPath = ''
+
+    if (Test-Path -LiteralPath $settingsPath) {
+        $backupPath = "$settingsPath.bak-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        Copy-Item -LiteralPath $settingsPath -Destination $backupPath -Force
+    }
 
     $settings = Get-Content -LiteralPath $TemplatePath -Raw | ConvertFrom-Json
     $devIcon = (Join-Path $IconsDirectory 'mbs-pixel-avatar.png').Replace('\', '/')
@@ -726,7 +724,48 @@ function Install-WindowsTerminalSettings {
     }
 
     $settings | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $settingsPath -Encoding UTF8
-    Write-Step "Windows Terminal settings installed. Backup: $backupPath"
+
+    if ([string]::IsNullOrWhiteSpace($backupPath)) {
+        Write-Step "Windows Terminal settings installed: $settingsPath"
+    } else {
+        Write-Step "Windows Terminal settings installed. Backup: $backupPath"
+    }
+}
+
+function Resolve-WindowsTerminalSettingsPath {
+    $stablePackageRoot = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe'
+    $previewPackageRoot = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe'
+    $unpackagedRoot = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal'
+
+    $settingsCandidates = @(
+        (Join-Path $stablePackageRoot 'LocalState\settings.json'),
+        (Join-Path $previewPackageRoot 'LocalState\settings.json'),
+        (Join-Path $unpackagedRoot 'settings.json')
+    )
+
+    $existingSettingsPath = $settingsCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+
+    if ($existingSettingsPath) {
+        return $existingSettingsPath
+    }
+
+    if (Test-Path -LiteralPath $stablePackageRoot) {
+        return Join-Path $stablePackageRoot 'LocalState\settings.json'
+    }
+
+    if (Test-Path -LiteralPath $previewPackageRoot) {
+        return Join-Path $previewPackageRoot 'LocalState\settings.json'
+    }
+
+    if (Get-Command wt -ErrorAction SilentlyContinue) {
+        return Join-Path $stablePackageRoot 'LocalState\settings.json'
+    }
+
+    if (Test-Path -LiteralPath $unpackagedRoot) {
+        return Join-Path $unpackagedRoot 'settings.json'
+    }
+
+    return ''
 }
 
 $repositoryRoot = Get-RepositoryRoot

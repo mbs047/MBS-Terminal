@@ -95,10 +95,16 @@ The full Laravel, Composer, NPM, navigation, `ls`, autocomplete, and system help
 For a fresh PC or when the GUI executable does not open, run the interactive terminal installer:
 
 ```powershell
+.\MBS-Terminal-Install.exe
+```
+
+The fallback command launcher is also available:
+
+```powershell
 .\MBS-Terminal-Install.cmd
 ```
 
-You can also call the PowerShell script directly:
+You can call the PowerShell script directly from a terminal, but do not double-click it:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-terminal.ps1
@@ -107,13 +113,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-terminal.ps1
 Useful presets:
 
 ```powershell
-.\install-terminal.ps1 -Preset Minimal
-.\install-terminal.ps1 -Preset Recommended -Yes
-.\install-terminal.ps1 -Preset Full
-.\install-terminal.ps1 -Preset Recommended -DryRun -NoAdminRelaunch
+.\MBS-Terminal-Install.exe -Preset Minimal
+.\MBS-Terminal-Install.exe -Preset Recommended -Yes
+.\MBS-Terminal-Install.exe -Preset Full
+.\MBS-Terminal-Install.exe -Preset Recommended -DryRun -NoAdminRelaunch
 ```
 
-The terminal installer checks administrator access, verifies `winget`, installs Windows Terminal when missing, then runs `install.ps1` with the selected Starship, PHP, Composer, and Laravel tooling options.
+The terminal installer checks administrator access, verifies `winget`, installs Windows Terminal when missing, then runs `install.ps1` with the selected Starship, PHP, Composer, and Laravel tooling options. Double-click runs keep the final status visible.
 
 ## Script Install
 
@@ -165,4 +171,4 @@ The restore script creates timestamped backups before changing anything. It rese
 .\build-installer.ps1
 ```
 
-The build uses the built-in .NET Framework C# compiler on Windows.
+The build uses the built-in .NET Framework C# compiler on Windows and produces `MBS-Terminal-Install.exe`, `MBS-Terminal-Setup.exe`, and `MBS-Terminal-Restore.exe`.

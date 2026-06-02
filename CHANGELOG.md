@@ -5,7 +5,9 @@
 ### Added
 
 - Interactive terminal installer for fresh PCs, including administrator relaunch, `winget` checks, Windows Terminal installation, presets, dry-run support, and sequential handoff to `install.ps1`.
-- Command launcher for the terminal installer through `MBS-Terminal-Install.cmd`.
+- Double-clickable terminal installer through `MBS-Terminal-Install.exe`.
+- Command launcher fallback for the terminal installer through `MBS-Terminal-Install.cmd`.
+- Richer terminal installer output with status badges, helper messages, clear sections, and final success, warning, canceled, or failed states.
 
 ### Fixed
 

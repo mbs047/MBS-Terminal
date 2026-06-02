@@ -1570,7 +1570,7 @@ namespace MbsTerminalSetup
 
             SelectCard installPhpCard = new SelectCard(SelectCard.CardMode.Check);
             installPhpCard.Key = "InstallPhp";
-            installPhpCard.TitleText = "Install PHP automatically with winget";
+            installPhpCard.TitleText = "Install PHP automatically";
             installPhpCard.SetBounds(44, 394, 360, 44);
             installPhpCard.Activated += delegate { UpdatePhpVersionEnabled(); };
             toolCards["InstallPhp"] = installPhpCard;

@@ -177,6 +177,284 @@ function Get-PhpWingetPackageId {
     return "PHP.PHP.$PhpVersion"
 }
 
+function Get-PhpFallbackArchitecture {
+    if ([Environment]::Is64BitOperatingSystem) {
+        return 'x64'
+    }
+
+    return 'x86'
+}
+
+function Get-PhpVisualStudioRuntime {
+    switch ($PhpVersion) {
+        '8.2' { return 'vs16' }
+        '8.3' { return 'vs16' }
+        default { return 'vs17' }
+    }
+}
+
+function Get-PhpFallbackDownloadCandidates {
+    $runtime = Get-PhpVisualStudioRuntime
+    $architecture = Get-PhpFallbackArchitecture
+    $candidates = @(
+        [pscustomobject]@{
+            Url          = "https://windows.php.net/downloads/releases/latest/php-$PhpVersion-Win32-$runtime-$architecture-latest.zip"
+            Architecture = $architecture
+        }
+    )
+
+    if ($architecture -eq 'x64') {
+        $candidates += [pscustomobject]@{
+            Url          = "https://windows.php.net/downloads/releases/latest/php-$PhpVersion-Win32-$runtime-x86-latest.zip"
+            Architecture = 'x86'
+        }
+    }
+
+    return $candidates
+}
+
+function Get-PhpFallbackInstallDirectory {
+    $baseDirectory = ''
+
+    if ($InstallScope -eq 'AllUsers' -and (Test-IsAdministrator) -and -not [string]::IsNullOrWhiteSpace($env:ProgramData)) {
+        $baseDirectory = Join-Path $env:ProgramData 'MBS-Terminal\PHP'
+    } else {
+        $localAppData = $env:LOCALAPPDATA
+
+        if ([string]::IsNullOrWhiteSpace($localAppData)) {
+            $localAppData = Join-Path $HOME 'AppData\Local'
+        }
+
+        $baseDirectory = Join-Path $localAppData 'MBS-Terminal\PHP'
+    }
+
+    return Join-Path $baseDirectory $PhpVersion
+}
+
+function Initialize-PhpIni {
+    param([string] $InstallDirectory)
+
+    $iniPath = Join-Path $InstallDirectory 'php.ini'
+
+    if (-not (Test-Path -LiteralPath $iniPath)) {
+        $templatePath = Join-Path $InstallDirectory 'php.ini-production'
+
+        if (-not (Test-Path -LiteralPath $templatePath)) {
+            $templatePath = Join-Path $InstallDirectory 'php.ini-development'
+        }
+
+        if (Test-Path -LiteralPath $templatePath) {
+            Copy-Item -LiteralPath $templatePath -Destination $iniPath -Force
+        }
+    }
+
+    if (-not (Test-Path -LiteralPath $iniPath)) {
+        return
+    }
+
+    $content = Get-Content -LiteralPath $iniPath -Raw
+    $content = [regex]::Replace($content, '(?m)^\s*;?\s*extension_dir\s*=\s*"?ext"?\s*$', 'extension_dir = "ext"')
+
+    foreach ($extension in @('curl', 'fileinfo', 'mbstring', 'openssl', 'pdo_mysql', 'pdo_sqlite', 'sqlite3', 'zip')) {
+        $escapedExtension = [regex]::Escape($extension)
+        $content = [regex]::Replace($content, "(?m)^\s*;\s*extension\s*=\s*$escapedExtension\s*$", "extension=$extension")
+    }
+
+    Set-Content -LiteralPath $iniPath -Value $content -Encoding ASCII
+}
+
+function Test-PhpExecutable {
+    param([string] $PhpExecutable)
+
+    if ([string]::IsNullOrWhiteSpace($PhpExecutable) -or -not (Test-Path -LiteralPath $PhpExecutable)) {
+        return $false
+    }
+
+    try {
+        $output = @(& $PhpExecutable --version 2>&1)
+        $exitCode = $LASTEXITCODE
+
+        if ($exitCode -eq 0) {
+            $firstLine = $output | Select-Object -First 1
+
+            if (-not [string]::IsNullOrWhiteSpace($firstLine)) {
+                Write-Step $firstLine
+            }
+
+            return $true
+        }
+
+        Write-SoftWarning "php.exe was found but did not run correctly (exit code $exitCode)."
+    } catch {
+        Write-SoftWarning "php.exe was found but could not start. $($_.Exception.Message)"
+    }
+
+    return $false
+}
+
+function Install-VisualCRuntimeForPhpIfPossible {
+    param([string] $Architecture = '')
+
+    $architecture = $Architecture
+
+    if ([string]::IsNullOrWhiteSpace($architecture)) {
+        $architecture = Get-PhpFallbackArchitecture
+    }
+
+    $packageId = "Microsoft.VCRedist.2015+.$architecture"
+
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        if (Invoke-WingetInstall -PackageId $packageId -Description 'Installing Microsoft Visual C++ Redistributable for PHP.') {
+            return
+        }
+
+        Write-SoftWarning 'winget could not install the Microsoft Visual C++ Redistributable. Trying the Microsoft download backup.'
+    }
+
+    $runtimeUrl = if ($architecture -eq 'x64') {
+        'https://aka.ms/vs/17/release/vc_redist.x64.exe'
+    } else {
+        'https://aka.ms/vs/17/release/vc_redist.x86.exe'
+    }
+
+    $runtimeInstaller = Join-Path $env:TEMP "vc_redist.$architecture.exe"
+
+    try {
+        Write-Step 'Downloading Microsoft Visual C++ Redistributable for PHP.'
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $runtimeUrl -OutFile $runtimeInstaller -UseBasicParsing
+
+        $process = if (Test-IsAdministrator) {
+            Start-Process -FilePath $runtimeInstaller -ArgumentList @('/install', '/quiet', '/norestart') -Wait -PassThru
+        } else {
+            Write-SoftWarning 'PHP may need the Microsoft Visual C++ Redistributable. Approve the Microsoft installer if Windows asks.'
+            Start-Process -FilePath $runtimeInstaller -ArgumentList @('/install', '/quiet', '/norestart') -Verb RunAs -Wait -PassThru
+        }
+
+        if ($process.ExitCode -eq 0 -or $process.ExitCode -eq 3010) {
+            Write-Step 'Microsoft Visual C++ Redistributable installed.'
+        } else {
+            Write-SoftWarning "Microsoft Visual C++ Redistributable installer exited with code $($process.ExitCode)."
+        }
+    } catch {
+        Write-SoftWarning "Could not install Microsoft Visual C++ Redistributable automatically. $($_.Exception.Message)"
+    } finally {
+        if (Test-Path -LiteralPath $runtimeInstaller) {
+            Remove-Item -LiteralPath $runtimeInstaller -Force
+        }
+    }
+}
+
+function Resolve-ExtractedPhpDirectory {
+    param([string] $ExtractRoot)
+
+    $rootPhp = Join-Path $ExtractRoot 'php.exe'
+
+    if (Test-Path -LiteralPath $rootPhp) {
+        return $ExtractRoot
+    }
+
+    $phpExecutable = Get-ChildItem -LiteralPath $ExtractRoot -Recurse -Filter 'php.exe' -File |
+        Select-Object -First 1
+
+    if ($phpExecutable) {
+        return $phpExecutable.Directory.FullName
+    }
+
+    return ''
+}
+
+function Install-PhpFromOfficialZip {
+    $installDirectory = Get-PhpFallbackInstallDirectory
+    $phpExecutable = Join-Path $installDirectory 'php.exe'
+
+    if ((-not $UpdateTools) -and (Test-PhpExecutable -PhpExecutable $phpExecutable)) {
+        Add-PathEntry -Directory $installDirectory
+        Write-Step "Using PHP from backup install: $installDirectory"
+        return $true
+    }
+
+    $downloadPath = Join-Path $env:TEMP "mbs-terminal-php-$PhpVersion.zip"
+    $extractRoot = Join-Path $env:TEMP ("MBS-Terminal-PHP-" + [Guid]::NewGuid().ToString('N'))
+    $backupDirectory = ''
+
+    foreach ($downloadCandidate in (Get-PhpFallbackDownloadCandidates)) {
+        $downloadUrl = $downloadCandidate.Url
+        $downloadArchitecture = $downloadCandidate.Architecture
+
+        try {
+            Write-Step "Installing PHP $PhpVersion from the official PHP zip backup."
+            Write-Step "Downloading $downloadUrl"
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+            if (Test-Path -LiteralPath $downloadPath) {
+                Remove-Item -LiteralPath $downloadPath -Force
+            }
+
+            if (Test-Path -LiteralPath $extractRoot) {
+                Remove-Item -LiteralPath $extractRoot -Recurse -Force
+            }
+
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $downloadPath -UseBasicParsing
+            Expand-Archive -LiteralPath $downloadPath -DestinationPath $extractRoot -Force
+
+            $extractedDirectory = Resolve-ExtractedPhpDirectory -ExtractRoot $extractRoot
+
+            if ([string]::IsNullOrWhiteSpace($extractedDirectory)) {
+                throw 'The PHP zip did not contain php.exe.'
+            }
+
+            $parentDirectory = Split-Path -Path $installDirectory -Parent
+
+            if (-not (Test-Path -LiteralPath $parentDirectory)) {
+                New-Item -ItemType Directory -Path $parentDirectory | Out-Null
+            }
+
+            if (Test-Path -LiteralPath $installDirectory) {
+                $backupDirectory = "$installDirectory.bak-$(Get-Date -Format 'yyyyMMddHHmmss')"
+                Move-Item -LiteralPath $installDirectory -Destination $backupDirectory
+                Write-Step "Backed up existing PHP folder: $backupDirectory"
+            }
+
+            Move-Item -LiteralPath $extractedDirectory -Destination $installDirectory
+            Initialize-PhpIni -InstallDirectory $installDirectory
+            Add-PathEntry -Directory $installDirectory
+            Refresh-ProcessPath
+
+            if (-not (Test-PhpExecutable -PhpExecutable $phpExecutable)) {
+                Install-VisualCRuntimeForPhpIfPossible -Architecture $downloadArchitecture
+                Refresh-ProcessPath
+            }
+
+            if (Test-PhpExecutable -PhpExecutable $phpExecutable) {
+                Write-Step "PHP installed from official backup: $installDirectory"
+                return $true
+            }
+
+            throw 'PHP was extracted, but php.exe did not pass verification.'
+        } catch {
+            Write-SoftWarning "Official PHP zip backup failed. $($_.Exception.Message)"
+
+            if (-not [string]::IsNullOrWhiteSpace($backupDirectory) -and
+                (Test-Path -LiteralPath $backupDirectory) -and
+                (-not (Test-Path -LiteralPath $installDirectory))) {
+                Move-Item -LiteralPath $backupDirectory -Destination $installDirectory
+                Write-Step "Restored previous PHP folder: $installDirectory"
+            }
+        } finally {
+            if (Test-Path -LiteralPath $downloadPath) {
+                Remove-Item -LiteralPath $downloadPath -Force
+            }
+
+            if (Test-Path -LiteralPath $extractRoot) {
+                Remove-Item -LiteralPath $extractRoot -Recurse -Force
+            }
+        }
+    }
+
+    return $false
+}
+
 function Get-PhpExecutable {
     if (-not [string]::IsNullOrWhiteSpace($PhpDirectory)) {
         $expandedPath = [Environment]::ExpandEnvironmentVariables($PhpDirectory)
@@ -305,7 +583,10 @@ function Install-PhpIfRequested {
         if ($phpAvailable) {
             Write-Step 'PHP is already available.'
         } else {
-            Write-SoftWarning 'winget is not available, so PHP could not be installed automatically.'
+            Write-SoftWarning 'winget is not available. Trying the official PHP zip backup.'
+            if (-not (Install-PhpFromOfficialZip)) {
+                Write-SoftWarning "Automatic PHP install failed. Re-run setup and choose 'use an existing PHP folder', or install PHP manually, then run setup again."
+            }
         }
         return
     }
@@ -319,7 +600,20 @@ function Install-PhpIfRequested {
         return
     }
 
-    if (-not (Invoke-WingetInstall -PackageId $phpPackageId -Description "Installing PHP $PhpVersion through winget.")) {
+    if (Invoke-WingetInstall -PackageId $phpPackageId -Description "Installing PHP $PhpVersion through winget.") {
+        $phpExecutable = Get-PhpExecutable
+
+        if (-not [string]::IsNullOrWhiteSpace($phpExecutable)) {
+            Write-Step "PHP installed through winget: $phpExecutable"
+            return
+        }
+
+        Write-SoftWarning 'winget finished, but php.exe was not found in PATH yet. Trying the official PHP zip backup.'
+    } else {
+        Write-SoftWarning 'Trying the official PHP zip backup.'
+    }
+
+    if (-not (Install-PhpFromOfficialZip)) {
         Write-SoftWarning "Automatic PHP install failed. Re-run setup and choose 'use an existing PHP folder', or install PHP manually, then run setup again."
     }
 }

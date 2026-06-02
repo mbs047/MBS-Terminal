@@ -110,10 +110,10 @@ Useful presets:
 .\MBS-Terminal-Install.exe -Preset Minimal
 .\MBS-Terminal-Install.exe -Preset Recommended -Yes
 .\MBS-Terminal-Install.exe -Preset Full
-.\MBS-Terminal-Install.exe -Preset Recommended -DryRun -NoAdminRelaunch
+.\MBS-Terminal-Install.exe -Preset Recommended -DryRun
 ```
 
-The terminal installer checks administrator access, verifies `winget`, installs Windows Terminal when missing, then runs `install.ps1` with the selected Starship, PHP, Composer, and Laravel tooling options. Double-click runs keep the final status visible.
+The terminal installer checks the selected install scope, verifies `winget` when available, installs Windows Terminal when missing, then runs `install.ps1` with the selected Starship, PHP, Composer, and Laravel tooling options. PHP installs use `winget` first and fall back to the official PHP Windows zip when `winget` is unavailable or cannot complete a portable install. Double-click runs keep the final status visible.
 
 ## Script Install
 

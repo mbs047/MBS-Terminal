@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
-using System.Security.Principal;
 
 [assembly: AssemblyProduct("MBS Terminal")]
 [assembly: AssemblyTitle("MBS Terminal Installer")]
@@ -19,11 +18,6 @@ namespace MbsTerminalInstall
     {
         private static int Main(string[] args)
         {
-            if (!IsAdministrator() && !HasSwitch(args, "NoAdminRelaunch") && !HasSwitch(args, "DryRun"))
-            {
-                return RelaunchAsAdministrator(args);
-            }
-
             string supportRoot = ResolveSupportRoot();
             bool extractedSupportRoot = false;
 
@@ -58,40 +52,6 @@ namespace MbsTerminalInstall
                 {
                     TryDeleteDirectory(supportRoot);
                 }
-            }
-        }
-
-        private static bool IsAdministrator()
-        {
-            WindowsIdentity identity = WindowsIdentity.GetCurrent();
-            WindowsPrincipal principal = new WindowsPrincipal(identity);
-            return principal.IsInRole(WindowsBuiltInRole.Administrator);
-        }
-
-        private static int RelaunchAsAdministrator(string[] args)
-        {
-            try
-            {
-                ProcessStartInfo startInfo = new ProcessStartInfo();
-                startInfo.FileName = typeof(Program).Assembly.Location;
-                startInfo.Arguments = BuildArgumentString(args);
-                startInfo.WorkingDirectory = Environment.CurrentDirectory;
-                startInfo.UseShellExecute = true;
-                startInfo.Verb = "runas";
-                Process.Start(startInfo);
-                return 0;
-            }
-            catch (System.ComponentModel.Win32Exception ex)
-            {
-                WriteError("Administrator permission is required to run MBS Terminal Install.");
-                WaitForEnter();
-                return ex.NativeErrorCode == 1223 ? 1 : ex.NativeErrorCode;
-            }
-            catch (Exception ex)
-            {
-                WriteError("Could not restart as administrator: " + ex.Message);
-                WaitForEnter();
-                return 1;
             }
         }
 
@@ -195,23 +155,6 @@ namespace MbsTerminalInstall
             }
 
             return false;
-        }
-
-        private static string BuildArgumentString(string[] args)
-        {
-            if (args == null || args.Length == 0)
-            {
-                return string.Empty;
-            }
-
-            List<string> quotedArguments = new List<string>();
-
-            foreach (string argument in args)
-            {
-                quotedArguments.Add(Quote(argument));
-            }
-
-            return string.Join(" ", quotedArguments.ToArray());
         }
 
         private static string Quote(string value)

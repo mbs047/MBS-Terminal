@@ -110,37 +110,6 @@ function Test-IsAdministrator {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-function Invoke-SelfAsAdministrator {
-    $arguments = @(
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        $PSCommandPath,
-        '-Preset',
-        $Preset
-    )
-
-    if ($Yes) {
-        $arguments += '-Yes'
-    }
-
-    if ($DryRun) {
-        $arguments += '-DryRun'
-    }
-
-    if ($NoAdminRelaunch) {
-        $arguments += '-NoAdminRelaunch'
-    }
-
-    if ($WaitAtEnd) {
-        $arguments += '-WaitAtEnd'
-    }
-
-    $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs -Wait -PassThru
-    exit $process.ExitCode
-}
-
 function Ask-YesNo {
     param(
         [Parameter(Mandatory = $true)]
@@ -494,11 +463,11 @@ function Read-InstallPlan {
     }
 
     Write-Step 'Choose required tools.'
-    Write-Help 'Windows Terminal is the shell window, winget installs missing packages, and Starship powers the prompt theme.'
+    Write-Help 'Windows Terminal is the shell window, winget installs packages when available, and PHP has an official zip backup.'
     $plan.InstallWindowsTerminal = Ask-YesNo -Question 'Install Windows Terminal when missing?' -Default $true
     $plan.InstallStarship = Ask-YesNo -Question 'Install Starship prompt when missing?' -Default $true
     Write-Help 'PHP and Composer are required for Laravel installer, Pint, Valet, Envoy, and Vapor.'
-    $plan.InstallPhp = Ask-YesNo -Question 'Install PHP with winget?' -Default $true
+    $plan.InstallPhp = Ask-YesNo -Question 'Install PHP automatically?' -Default $true
 
     if ($plan.InstallPhp) {
         $plan.PhpVersion = Read-PhpVersion -Default $plan.PhpVersion
@@ -579,8 +548,8 @@ function Show-InstallPlan {
     param([pscustomobject] $Plan)
 
     Write-Step 'Review install sequence.'
-    Write-Status -Label 'CHECK' -Message 'Confirm administrator rights and required repository files.' -Color Cyan
-    Write-Status -Label 'CHECK' -Message 'Verify winget when selected installs need packages.' -Color Cyan
+    Write-Status -Label 'CHECK' -Message 'Confirm selected install scope and required repository files.' -Color Cyan
+    Write-Status -Label 'CHECK' -Message 'Verify winget and package fallbacks when selected installs need tools.' -Color Cyan
     Write-Status -Label 'INSTALL' -Message 'Install Windows Terminal when it is missing.' -Color Cyan
     Write-Status -Label 'INSTALL' -Message 'Apply MBS profile, prompt, icons, and selected developer tools.' -Color Cyan
     Write-Info ''
@@ -823,13 +792,11 @@ function Write-CancelSummary {
 }
 
 function Invoke-MbsTerminalInstall {
-    if ((-not (Test-IsAdministrator)) -and (-not $NoAdminRelaunch) -and (-not $DryRun)) {
-        Write-Banner
-        Write-Status -Label 'ADMIN' -Message 'Administrator permission is required. Relaunching elevated...' -Color Yellow
-        Invoke-SelfAsAdministrator
-    }
-
     Write-Banner
+
+    if ((-not (Test-IsAdministrator)) -and (-not $DryRun)) {
+        Write-Status -Label 'USER' -Message 'Running without administrator rights. All-users PATH requests will fall back to current-user when needed.' -Color Yellow
+    }
 
     $repositoryRoot = Resolve-RepositoryRoot
     $installScript = Join-Path $repositoryRoot 'install.ps1'
@@ -842,10 +809,6 @@ function Invoke-MbsTerminalInstall {
     }
 
     Write-Ok 'install.ps1 was found.'
-
-    if ((-not (Test-IsAdministrator)) -and (-not $DryRun)) {
-        throw 'MBS Terminal installer must be run as administrator.'
-    }
 
     if ($DryRun) {
         Write-Status -Label 'DRYRUN' -Message 'No machine changes will be made in this run.' -Color DarkGray

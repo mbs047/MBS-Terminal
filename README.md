@@ -19,7 +19,7 @@ Download or clone this repo, then run:
 .\MBS-Terminal-Install.exe
 ```
 
-The terminal installer is the recommended path on fresh PCs. It opens by double-click, checks administrator access, installs missing requirements in sequence, and then runs the main setup script.
+The terminal installer is the recommended path on fresh PCs. It opens by double-click, installs missing requirements in sequence, and then runs the main setup script.
 
 `install-terminal.ps1` is the script behind the installer. Do not double-click it directly, because Windows may open `.ps1` files in an editor.
 

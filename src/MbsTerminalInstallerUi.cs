@@ -2329,6 +2329,11 @@ namespace MbsTerminalSetup
         {
             if (isError)
             {
+                if (IsComposerProgressLine(line))
+                {
+                    return Palette.TextDark;
+                }
+
                 return Palette.Danger;
             }
 
@@ -2344,6 +2349,58 @@ namespace MbsTerminalSetup
             }
 
             return Palette.TextDark;
+        }
+
+        private static bool IsComposerProgressLine(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return true;
+            }
+
+            string text = line.Trim();
+
+            if (text.StartsWith("Changed current directory to ", StringComparison.OrdinalIgnoreCase)
+                || text.EndsWith("composer.json has been created", StringComparison.OrdinalIgnoreCase)
+                || text.StartsWith("- Installing ", StringComparison.OrdinalIgnoreCase)
+                || text.StartsWith("- Downloading ", StringComparison.OrdinalIgnoreCase)
+                || text.StartsWith("- Locking ", StringComparison.OrdinalIgnoreCase)
+                || text.StartsWith("- Upgrading ", StringComparison.OrdinalIgnoreCase)
+                || text.StartsWith("Installing dependencies", StringComparison.OrdinalIgnoreCase)
+                || text.StartsWith("Writing lock file", StringComparison.OrdinalIgnoreCase)
+                || text.StartsWith("Generating autoload files", StringComparison.OrdinalIgnoreCase)
+                || text.StartsWith("Using version ", StringComparison.OrdinalIgnoreCase)
+                || text.StartsWith("Package operations:", StringComparison.OrdinalIgnoreCase)
+                || text.StartsWith("No security vulnerability advisories found", StringComparison.OrdinalIgnoreCase)
+                || text.IndexOf(" package suggestions were added by new dependencies", StringComparison.OrdinalIgnoreCase) >= 0
+                || text.IndexOf(" packages you are using are looking for funding", StringComparison.OrdinalIgnoreCase) >= 0
+                || text.IndexOf("composer fund", StringComparison.OrdinalIgnoreCase) >= 0
+                || text.IndexOf("Extracting archive", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+
+            bool hasProgressCharacters = false;
+
+            for (int index = 0; index < text.Length; index++)
+            {
+                char character = text[index];
+
+                if (character == '[' || character == ']' || character == '=' || character == '>' || character == '-'
+                    || character == ' ' || character == '%' || char.IsDigit(character) || character == '/')
+                {
+                    if (character == '[' || character == ']' || character == '=' || character == '>' || character == '%')
+                    {
+                        hasProgressCharacters = true;
+                    }
+
+                    continue;
+                }
+
+                return false;
+            }
+
+            return hasProgressCharacters;
         }
 
         private void SetupFormClosing(object sender, FormClosingEventArgs e)

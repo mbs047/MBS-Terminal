@@ -287,7 +287,7 @@ function Add-PathEntry {
             }
 
             if (Add-MbsProfilePathEntry -ResolvedDirectory $resolvedDirectory) {
-                Write-SoftWarning "Could not save Windows user PATH. MBS Terminal will load this path from the PowerShell profile: $resolvedDirectory"
+                Write-Step "Windows user PATH is locked; MBS Terminal will load this path from the PowerShell profile: $resolvedDirectory"
                 return
             }
 

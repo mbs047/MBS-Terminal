@@ -18,6 +18,7 @@ Mention any platform, terminal profile, or installer option used while testing.
 
 ## Safety Checklist
 
+- [ ] This pull request comes from a branch, not direct commits on `main`.
 - [ ] This change avoids destructive defaults.
 - [ ] This change keeps backups or preserves existing user config where practical.
 - [ ] I removed generated backups, logs, and temporary files from the commit.

@@ -17,6 +17,14 @@ git clone https://github.com/mbs047/MBS-Terminal.git
 cd MBS-Terminal
 ```
 
+Enable the repository guards after cloning:
+
+```powershell
+.\scripts\Enable-RepositoryGuards.ps1
+```
+
+This configures Git to use the checked-in hooks under `.githooks`. The hook blocks local commits on `main` and `master`, so work starts on a topic branch and lands through a pull request.
+
 Run the installer from the repository root:
 
 ```powershell
@@ -34,6 +42,16 @@ To rebuild the launcher executable:
 ```powershell
 .\build-installer.ps1
 ```
+
+## Branch and Pull Request Flow
+
+Do not commit directly on `main`. Create a focused branch before editing:
+
+```powershell
+git switch -c feature/short-description
+```
+
+Open a pull request for review when the change is ready. Keep generated installer binaries out of the PR unless the change intentionally rebuilds release assets.
 
 ## Contribution Checklist
 

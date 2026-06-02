@@ -1,0 +1,32 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  powershell-tests:
+    name: PowerShell safety tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify main branch guard
+        shell: powershell
+        run: .\tests\Verify-MainBranchGuard.ps1
+
+      - name: Verify PATH fallback
+        shell: powershell
+        run: .\tests\Verify-PathFallback.ps1
+
+      - name: Verify terminal profile launch
+        shell: powershell
+        run: .\tests\Verify-TerminalProfileLaunch.ps1

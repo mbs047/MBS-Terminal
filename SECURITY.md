@@ -22,3 +22,4 @@ Please include:
 - Do not post access tokens, private paths, or personal profile contents in public issues.
 - Do not include proof-of-concept code that modifies a user's profile or terminal settings without clear warnings.
 - Prefer small, reviewable security fixes.
+- Use a feature branch and pull request for repository changes; direct commits to `main` are blocked locally by the checked-in Git hook when repository guards are enabled.

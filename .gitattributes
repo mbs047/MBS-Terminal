@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Git hooks are executed by Git's shell runner and should stay LF-only.
+.githooks/* text eol=lf

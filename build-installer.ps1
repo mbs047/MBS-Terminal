@@ -115,6 +115,21 @@ function ConvertTo-CSharpBase64Expression {
     return 'string.Concat(new string[] { ' + (($chunks.ToArray()) -join ', ') + ' })'
 }
 
+function Assert-AsciiFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Path
+    )
+
+    $bytes = [IO.File]::ReadAllBytes($Path)
+
+    for ($index = 0; $index -lt $bytes.Length; $index++) {
+        if ($bytes[$index] -gt 127) {
+            throw "Non-ASCII byte found in installer support file: $Path"
+        }
+    }
+}
+
 function New-TerminalInstallerSupportSource {
     param(
         [Parameter(Mandatory = $true)]
@@ -149,6 +164,10 @@ function New-TerminalInstallerSupportSource {
 
         if (-not (Test-Path -LiteralPath $sourcePath)) {
             throw "Support file was not found: $relativePath"
+        }
+
+        if ($relativePath -match '\.(ps1|toml|json)$') {
+            Assert-AsciiFile -Path $sourcePath
         }
 
         $base64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($sourcePath))

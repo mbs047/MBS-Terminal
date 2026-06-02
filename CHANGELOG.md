@@ -11,6 +11,7 @@
 ### Fixed
 
 - Windows Terminal settings can now be created when Windows Terminal is freshly installed and has not generated `settings.json` yet.
+- Installer prompt configuration now uses ASCII-only markers to avoid symbol rendering and encoding issues on fresh PCs.
 
 ### Removed
 

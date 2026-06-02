@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+
+branch_name="$(git symbolic-ref --quiet --short HEAD || true)"
+
+case "$branch_name" in
+  main|master)
+    cat >&2 <<'EOF'
+Direct commits to main are blocked for this repository.
+
+Create a feature branch, commit there, and open a pull request instead:
+  git switch -c codex/my-change
+EOF
+    exit 1
+    ;;
+esac
+
+exit 0

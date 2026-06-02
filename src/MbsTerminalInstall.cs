@@ -126,7 +126,7 @@ namespace MbsTerminalInstall
                 installerArguments.Add(Quote(argument));
             }
 
-            if (!HasSwitch(args, "WaitAtEnd"))
+            if (args.Length == 0 && !HasSwitch(args, "WaitAtEnd"))
             {
                 installerArguments.Add("-WaitAtEnd");
             }

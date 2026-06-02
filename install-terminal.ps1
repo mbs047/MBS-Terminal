@@ -5,25 +5,32 @@ param(
 
     [switch] $Yes,
     [switch] $DryRun,
-    [switch] $NoAdminRelaunch
+    [switch] $NoAdminRelaunch,
+    [switch] $WaitAtEnd
 )
 
 $ErrorActionPreference = 'Stop'
 
 $script:Warnings = New-Object System.Collections.Generic.List[string]
+$script:StepNumber = 0
+$script:FinalState = 'SUCCESS'
 
 function Write-Banner {
     Write-Host ''
-    Write-Host 'MBS Terminal interactive installer' -ForegroundColor Cyan
-    Write-Host 'Fresh Windows setup, one step at a time.' -ForegroundColor DarkCyan
+    Write-Host '+----------------------------------------------------------------------+' -ForegroundColor DarkCyan
+    Write-Host '| MBS Terminal Installer                                               |' -ForegroundColor Cyan
+    Write-Host '| Fresh Windows setup, one clear step at a time.                       |' -ForegroundColor DarkCyan
+    Write-Host '+----------------------------------------------------------------------+' -ForegroundColor DarkCyan
     Write-Host ''
 }
 
 function Write-Step {
     param([string] $Message)
 
+    $script:StepNumber++
     Write-Host ''
-    Write-Host "==> $Message" -ForegroundColor Cyan
+    Write-Host ("[{0:00}] {1}" -f $script:StepNumber, $Message) -ForegroundColor Cyan
+    Write-Host ('-' * 72) -ForegroundColor DarkCyan
 }
 
 function Write-Info {
@@ -32,17 +39,69 @@ function Write-Info {
     Write-Host "    $Message" -ForegroundColor Gray
 }
 
+function Write-Help {
+    param([string] $Message)
+
+    Write-Host "    Hint: $Message" -ForegroundColor DarkGray
+}
+
+function Write-Status {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Label,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Message,
+
+        [ConsoleColor] $Color = [ConsoleColor]::Gray
+    )
+
+    Write-Host ("    [{0,-7}] {1}" -f $Label.ToUpperInvariant(), $Message) -ForegroundColor $Color
+}
+
 function Write-Ok {
     param([string] $Message)
 
-    Write-Host "    OK: $Message" -ForegroundColor Green
+    Write-Status -Label 'READY' -Message $Message -Color Green
+}
+
+function Write-Done {
+    param([string] $Message)
+
+    Write-Status -Label 'DONE' -Message $Message -Color Green
+}
+
+function Write-Skip {
+    param([string] $Message)
+
+    Write-Status -Label 'SKIP' -Message $Message -Color DarkGray
 }
 
 function Write-SoftWarning {
     param([string] $Message)
 
     [void] $script:Warnings.Add($Message)
-    Write-Host "    Warning: $Message" -ForegroundColor Yellow
+    Write-Status -Label 'WARN' -Message $Message -Color Yellow
+}
+
+function Write-PlanRow {
+    param(
+        [string] $Label,
+        [string] $Value,
+        [ConsoleColor] $Color = [ConsoleColor]::Gray
+    )
+
+    Write-Host ("    {0,-20} {1}" -f ($Label + ':'), $Value) -ForegroundColor $Color
+}
+
+function Wait-ForExitIfRequested {
+    if (-not $WaitAtEnd) {
+        return
+    }
+
+    Write-Host ''
+    Write-Host 'Press Enter to close this installer...' -ForegroundColor DarkGray
+    [void](Read-Host)
 }
 
 function Test-IsAdministrator {
@@ -72,6 +131,10 @@ function Invoke-SelfAsAdministrator {
 
     if ($NoAdminRelaunch) {
         $arguments += '-NoAdminRelaunch'
+    }
+
+    if ($WaitAtEnd) {
+        $arguments += '-WaitAtEnd'
     }
 
     $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs -Wait -PassThru
@@ -193,10 +256,11 @@ function Invoke-NativeCommand {
     Write-Step $Description
 
     if ($DryRun) {
-        Write-Info ("DRY RUN: {0} {1}" -f $FilePath, ($Arguments -join ' '))
+        Write-Status -Label 'DRYRUN' -Message ("{0} {1}" -f $FilePath, ($Arguments -join ' ')) -Color DarkGray
         return $true
     }
 
+    Write-Status -Label 'INSTALL' -Message ("Starting {0}" -f $FilePath) -Color Cyan
     & $FilePath @Arguments
     $exitCode = $LASTEXITCODE
 
@@ -211,6 +275,7 @@ function Invoke-NativeCommand {
         throw $message
     }
 
+    Write-Done "$Description completed."
     return $true
 }
 
@@ -219,6 +284,8 @@ function Test-Winget {
 }
 
 function Install-WingetIfMissing {
+    Write-Status -Label 'CHECK' -Message 'Looking for winget package manager.' -Color Cyan
+
     if (Test-Winget) {
         Write-Ok 'winget is available.'
         return $true
@@ -236,10 +303,12 @@ function Install-WingetIfMissing {
         Write-Step 'Downloading Microsoft App Installer.'
 
         if ($DryRun) {
-            Write-Info "DRY RUN: download https://aka.ms/getwinget to $wingetBundlePath"
+            Write-Status -Label 'DRYRUN' -Message "download https://aka.ms/getwinget to $wingetBundlePath" -Color DarkGray
         } else {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            Write-Status -Label 'INSTALL' -Message 'Downloading App Installer bundle from Microsoft.' -Color Cyan
             Invoke-WebRequest -Uri 'https://aka.ms/getwinget' -OutFile $wingetBundlePath -UseBasicParsing
+            Write-Status -Label 'INSTALL' -Message 'Registering App Installer package.' -Color Cyan
             Add-AppxPackage -Path $wingetBundlePath
             Refresh-ProcessPath
         }
@@ -285,9 +354,11 @@ function Install-WindowsTerminalIfRequested {
     param([bool] $InstallWindowsTerminal)
 
     if (-not $InstallWindowsTerminal) {
-        Write-Info 'Windows Terminal install was skipped by selection.'
+        Write-Skip 'Windows Terminal install was skipped by selection.'
         return
     }
+
+    Write-Status -Label 'CHECK' -Message 'Looking for Windows Terminal.' -Color Cyan
 
     if (Test-WindowsTerminal) {
         Write-Ok 'Windows Terminal is already installed.'
@@ -317,7 +388,7 @@ function Install-WindowsTerminalIfRequested {
     Refresh-ProcessPath
 
     if (Test-WindowsTerminal) {
-        Write-Ok 'Windows Terminal is ready.'
+        Write-Done 'Windows Terminal is ready.'
     } else {
         Write-SoftWarning 'Windows Terminal was requested, but it was not detected yet. Open Microsoft Store or run this installer again after App Installer finishes updates.'
     }
@@ -373,6 +444,7 @@ function Read-InstallPlan {
     }
 
     Write-Step 'Choose profile settings.'
+    Write-Help 'These values control the welcome prompt name and the folder opened by new terminal tabs.'
     $plan.DisplayName = Read-TextValue -Prompt 'Prompt display name' -Default $plan.DisplayName
     $plan.StartingDirectory = Read-TextValue -Prompt 'Terminal starting directory' -Default $plan.StartingDirectory
 
@@ -394,8 +466,10 @@ function Read-InstallPlan {
     }
 
     Write-Step 'Choose required tools.'
+    Write-Help 'Windows Terminal is the shell window, winget installs missing packages, and Starship powers the prompt theme.'
     $plan.InstallWindowsTerminal = Ask-YesNo -Question 'Install Windows Terminal when missing?' -Default $true
     $plan.InstallStarship = Ask-YesNo -Question 'Install Starship prompt when missing?' -Default $true
+    Write-Help 'PHP and Composer are required for Laravel installer, Pint, Valet, Envoy, and Vapor.'
     $plan.InstallPhp = Ask-YesNo -Question 'Install PHP with winget?' -Default $true
 
     if ($plan.InstallPhp) {
@@ -409,6 +483,7 @@ function Read-InstallPlan {
     $plan.InstallComposer = Ask-YesNo -Question 'Install Composer?' -Default $true
 
     Write-Step 'Choose Laravel tooling.'
+    Write-Help 'Recommended installs Laravel Installer and Pint. Valet, Envoy, and Vapor are useful but more specialized.'
     $plan.InstallLaravel = Ask-YesNo -Question 'Install Laravel Installer?' -Default $true
     $plan.InstallValet = Ask-YesNo -Question 'Install Valet for Windows?' -Default $false
     $plan.InstallPint = Ask-YesNo -Question 'Install Laravel Pint?' -Default $true
@@ -438,25 +513,25 @@ function Repair-PlanDependencies {
 function Show-InstallPlan {
     param([pscustomobject] $Plan)
 
-    Write-Step 'Install sequence.'
-    Write-Info '1. Check administrator rights and repository files.'
-    Write-Info '2. Ensure winget is available when selected installs need it.'
-    Write-Info '3. Install Windows Terminal when missing.'
-    Write-Info '4. Run install.ps1 to apply MBS Terminal profile, prompt, icons, and selected developer tools.'
+    Write-Step 'Review install sequence.'
+    Write-Status -Label 'CHECK' -Message 'Confirm administrator rights and required repository files.' -Color Cyan
+    Write-Status -Label 'CHECK' -Message 'Verify winget when selected installs need packages.' -Color Cyan
+    Write-Status -Label 'INSTALL' -Message 'Install Windows Terminal when it is missing.' -Color Cyan
+    Write-Status -Label 'INSTALL' -Message 'Apply MBS profile, prompt, icons, and selected developer tools.' -Color Cyan
     Write-Info ''
-    Write-Info "Display name:        $($Plan.DisplayName)"
-    Write-Info "Starting directory:  $($Plan.StartingDirectory)"
-    Write-Info "Install scope:       $($Plan.InstallScope)"
-    Write-Info "Windows Terminal:    $(ConvertTo-YesNo $Plan.InstallWindowsTerminal)"
-    Write-Info "Starship:            $(ConvertTo-YesNo $Plan.InstallStarship)"
-    Write-Info "PHP:                 $(ConvertTo-PhpSummary $Plan)"
-    Write-Info "Composer:            $(ConvertTo-YesNo $Plan.InstallComposer)"
-    Write-Info "Laravel Installer:   $(ConvertTo-YesNo $Plan.InstallLaravel)"
-    Write-Info "Valet for Windows:   $(ConvertTo-YesNo $Plan.InstallValet)"
-    Write-Info "Pint:                $(ConvertTo-YesNo $Plan.InstallPint)"
-    Write-Info "Envoy:               $(ConvertTo-YesNo $Plan.InstallEnvoy)"
-    Write-Info "Vapor CLI:           $(ConvertTo-YesNo $Plan.InstallVapor)"
-    Write-Info "Update tools:        $(ConvertTo-YesNo $Plan.UpdateTools)"
+    Write-PlanRow -Label 'Display name' -Value $Plan.DisplayName -Color White
+    Write-PlanRow -Label 'Starting directory' -Value $Plan.StartingDirectory -Color White
+    Write-PlanRow -Label 'Install scope' -Value $Plan.InstallScope
+    Write-PlanRow -Label 'Windows Terminal' -Value (ConvertTo-YesNo $Plan.InstallWindowsTerminal)
+    Write-PlanRow -Label 'Starship' -Value (ConvertTo-YesNo $Plan.InstallStarship)
+    Write-PlanRow -Label 'PHP' -Value (ConvertTo-PhpSummary $Plan)
+    Write-PlanRow -Label 'Composer' -Value (ConvertTo-YesNo $Plan.InstallComposer)
+    Write-PlanRow -Label 'Laravel Installer' -Value (ConvertTo-YesNo $Plan.InstallLaravel)
+    Write-PlanRow -Label 'Valet for Windows' -Value (ConvertTo-YesNo $Plan.InstallValet)
+    Write-PlanRow -Label 'Pint' -Value (ConvertTo-YesNo $Plan.InstallPint)
+    Write-PlanRow -Label 'Envoy' -Value (ConvertTo-YesNo $Plan.InstallEnvoy)
+    Write-PlanRow -Label 'Vapor CLI' -Value (ConvertTo-YesNo $Plan.InstallVapor)
+    Write-PlanRow -Label 'Update tools' -Value (ConvertTo-YesNo $Plan.UpdateTools)
 }
 
 function ConvertTo-YesNo {
@@ -550,64 +625,113 @@ function Build-InstallScriptArguments {
 }
 
 function Write-Summary {
-    Write-Step 'Finished.'
+    Write-Step 'Final status.'
 
     if ($script:Warnings.Count -gt 0) {
-        Write-Host 'Warnings:' -ForegroundColor Yellow
+        $script:FinalState = 'COMPLETED WITH WARNINGS'
+        Write-Status -Label 'WARN' -Message $script:FinalState -Color Yellow
+        Write-Host ''
+        Write-Host '    Warnings:' -ForegroundColor Yellow
 
         foreach ($warning in $script:Warnings) {
-            Write-Host "  - $warning" -ForegroundColor Yellow
+            Write-Host "      - $warning" -ForegroundColor Yellow
         }
 
         Write-Host ''
-        Write-Host 'Open a new terminal after fixing any warning above, then run this installer again if needed.' -ForegroundColor Yellow
+        Write-Host '    Open a new terminal after fixing any warning above, then run this installer again if needed.' -ForegroundColor Yellow
         return
     }
 
-    Write-Host 'MBS Terminal setup completed. Open a new Windows Terminal tab to use it.' -ForegroundColor Green
+    $script:FinalState = 'SUCCESS'
+    Write-Status -Label 'SUCCESS' -Message 'MBS Terminal setup completed.' -Color Green
+    Write-Info 'Open a new Windows Terminal tab to use it.'
 }
 
-if ((-not (Test-IsAdministrator)) -and (-not $NoAdminRelaunch) -and (-not $DryRun)) {
+function Write-FailureSummary {
+    param([string] $Message)
+
+    $script:FinalState = 'FAILED'
+    Write-Step 'Final status.'
+    Write-Status -Label 'FAILED' -Message 'MBS Terminal setup did not complete.' -Color Red
+    Write-Info $Message
+    Write-Info 'Fix the message above, then run MBS-Terminal-Install.exe again.'
+}
+
+function Write-CancelSummary {
+    $script:FinalState = 'CANCELED'
+    Write-Step 'Final status.'
+    Write-Status -Label 'CANCELED' -Message 'Install canceled before changes were made.' -Color Yellow
+}
+
+function Invoke-MbsTerminalInstall {
+    if ((-not (Test-IsAdministrator)) -and (-not $NoAdminRelaunch) -and (-not $DryRun)) {
+        Write-Banner
+        Write-Status -Label 'ADMIN' -Message 'Administrator permission is required. Relaunching elevated...' -Color Yellow
+        Invoke-SelfAsAdministrator
+    }
+
     Write-Banner
-    Write-Info 'Administrator permission is required. Relaunching this installer elevated...'
-    Invoke-SelfAsAdministrator
+
+    $repositoryRoot = Resolve-RepositoryRoot
+    $installScript = Join-Path $repositoryRoot 'install.ps1'
+
+    Write-Step 'Preparing installer.'
+    Write-Status -Label 'CHECK' -Message "Repository root: $repositoryRoot" -Color Cyan
+
+    if (-not (Test-Path -LiteralPath $installScript)) {
+        throw "install.ps1 was not found next to this script. Expected: $installScript"
+    }
+
+    Write-Ok 'install.ps1 was found.'
+
+    if ((-not (Test-IsAdministrator)) -and (-not $DryRun)) {
+        throw 'MBS Terminal installer must be run as administrator.'
+    }
+
+    if ($DryRun) {
+        Write-Status -Label 'DRYRUN' -Message 'No machine changes will be made in this run.' -Color DarkGray
+    }
+
+    $plan = Read-InstallPlan
+    Repair-PlanDependencies -Plan $plan
+    Show-InstallPlan -Plan $plan
+
+    if (-not (Ask-YesNo -Question 'Start installation now?' -Default $true)) {
+        Write-CancelSummary
+        return 1
+    }
+
+    $needsWinget = $plan.InstallWindowsTerminal -or $plan.InstallStarship -or $plan.InstallPhp
+
+    if ($needsWinget) {
+        Write-Step 'Checking package manager.'
+        [void](Install-WingetIfMissing)
+    } else {
+        Write-Step 'Checking package manager.'
+        Write-Skip 'winget is not needed for the selected options.'
+    }
+
+    Install-WindowsTerminalIfRequested -InstallWindowsTerminal $plan.InstallWindowsTerminal
+
+    $installArguments = Build-InstallScriptArguments -InstallScript $installScript -Plan $plan
+    [void](Invoke-NativeCommand `
+        -FilePath 'powershell.exe' `
+        -Arguments $installArguments `
+        -Description 'Running MBS Terminal installer.')
+
+    Write-Summary
+    return 0
 }
 
-Write-Banner
+$exitCode = 1
 
-$repositoryRoot = Resolve-RepositoryRoot
-$installScript = Join-Path $repositoryRoot 'install.ps1'
-
-if (-not (Test-Path -LiteralPath $installScript)) {
-    throw "install.ps1 was not found next to this script. Expected: $installScript"
+try {
+    $exitCode = Invoke-MbsTerminalInstall
+} catch {
+    Write-FailureSummary -Message $_.Exception.Message
+    $exitCode = 1
+} finally {
+    Wait-ForExitIfRequested
 }
 
-if ((-not (Test-IsAdministrator)) -and (-not $DryRun)) {
-    throw 'MBS Terminal installer must be run as administrator.'
-}
-
-$plan = Read-InstallPlan
-Repair-PlanDependencies -Plan $plan
-Show-InstallPlan -Plan $plan
-
-if (-not (Ask-YesNo -Question 'Start installation now?' -Default $true)) {
-    Write-Host 'Install canceled before changes were made.' -ForegroundColor Yellow
-    exit 1
-}
-
-$needsWinget = $plan.InstallWindowsTerminal -or $plan.InstallStarship -or $plan.InstallPhp
-
-if ($needsWinget) {
-    Write-Step 'Checking winget.'
-    [void](Install-WingetIfMissing)
-}
-
-Install-WindowsTerminalIfRequested -InstallWindowsTerminal $plan.InstallWindowsTerminal
-
-$installArguments = Build-InstallScriptArguments -InstallScript $installScript -Plan $plan
-[void](Invoke-NativeCommand `
-    -FilePath 'powershell.exe' `
-    -Arguments $installArguments `
-    -Description 'Running MBS Terminal installer.')
-
-Write-Summary
+exit $exitCode

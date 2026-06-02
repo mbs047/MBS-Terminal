@@ -6,20 +6,35 @@
 
 ### Added
 
-- Beta graphical setup wizard asset through `MBS-Terminal-Setup.exe`.
-- Official PHP Windows zip fallback when `winget` is unavailable or cannot complete a PHP install.
+- Stable release installer asset: `MBS-Terminal-Install.exe`.
+- Beta graphical setup wizard asset: `MBS-Terminal-Setup.exe`.
+- Restore utility asset: `MBS-Terminal-Restore.exe`.
+- Interactive terminal installer for fresh PCs, including selected install scope handling, `winget` checks, Windows Terminal installation, presets, dry-run support, and sequential handoff to `install.ps1`.
+- Optional installer support for PHP 8.2, 8.3, 8.4, and 8.5.
+- Optional Laravel/PHP tooling installs for Composer, Laravel Installer, Valet for Windows, Pint, Envoy, Vapor CLI, Pest PHP, Larastan, Rector, and Ray.
+- Optional system and productivity tool installs for Git, Node.js LTS, nvm-windows, GitHub CLI, mkcert, Memurai (Redis-compatible), Docker Desktop, TablePlus, fzf, bat, ripgrep, and lazygit.
+- Official PHP Windows zip fallback when `winget` is unavailable or cannot complete a portable PHP install.
 - Composer `composer.phar` fallback path when Composer setup cannot complete.
+- PowerShell profile PATH fallback file for machines where persistent Windows PATH writes are blocked.
 
 ### Changed
 
 - Marked `MBS-Terminal-Install.exe` as the stable, recommended release installer.
 - Marked `MBS-Terminal-Setup.exe` as beta and not stable.
+- Kept optional extra tools defaulted to `No` unless explicitly selected.
+- Allowed portable `winget` installs to run without forced elevation when needed.
+- Improved terminal installer output with clearer status rows, final summaries, and quieter progress logging.
 - Rebuilt release installer assets with the latest fallback and logging fixes.
 
 ### Fixed
 
+- Windows Terminal settings can be created when Windows Terminal exists but `settings.json` has not been generated yet.
+- PHP install no longer fails the whole setup when `winget` returns access denied for portable packages.
+- Composer setup failures recover through the bundled `composer.phar` fallback path.
 - Composer fallback global package installs now run through the verified `php.exe composer.phar` runner.
+- PATH updates fall back from machine PATH to user PATH, then to the MBS Terminal profile PATH fallback when Windows blocks persistent writes.
 - MBS Terminal profile launch uses a process execution-policy bypass for the installed PowerShell command line.
+- Installer logs avoid noisy Composer progress lines and false warning output.
 
 ## v1.1.0 - 2026-06-02
 

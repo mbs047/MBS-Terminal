@@ -17,7 +17,7 @@ if (-not $compiler) {
     throw 'C# compiler was not found. Expected .NET Framework csc.exe.'
 }
 
-function Build-WindowsExecutable {
+function Build-Executable {
     param(
         [Parameter(Mandatory = $true)]
         [string[]] $Source,
@@ -25,17 +25,23 @@ function Build-WindowsExecutable {
         [Parameter(Mandatory = $true)]
         [string] $Output,
 
+        [ValidateSet('exe', 'winexe')]
+        [string] $Target = 'exe',
+
         [string] $Icon = ''
     )
 
     $compilerArguments = @(
         '/nologo',
         '/optimize+',
-        '/target:winexe',
-        '/reference:System.Drawing.dll',
-        '/reference:System.Windows.Forms.dll',
+        "/target:$Target",
         "/out:$Output"
     )
+
+    if ($Target -eq 'winexe') {
+        $compilerArguments += '/reference:System.Drawing.dll'
+        $compilerArguments += '/reference:System.Windows.Forms.dll'
+    }
 
     if (-not [string]::IsNullOrWhiteSpace($Icon) -and (Test-Path -LiteralPath $Icon)) {
         $compilerArguments += "/win32icon:$Icon"
@@ -49,37 +55,8 @@ function Build-WindowsExecutable {
         exit $LASTEXITCODE
     }
 
-    Write-Host "Built $Output" -ForegroundColor Cyan
-}
-
-function Build-ConsoleExecutable {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string[]] $Source,
-
-        [Parameter(Mandatory = $true)]
-        [string] $Output,
-
-        [string] $Icon = ''
-    )
-
-    $compilerArguments = @(
-        '/nologo',
-        '/optimize+',
-        '/target:exe',
-        "/out:$Output"
-    )
-
-    if (-not [string]::IsNullOrWhiteSpace($Icon) -and (Test-Path -LiteralPath $Icon)) {
-        $compilerArguments += "/win32icon:$Icon"
-    }
-
-    $compilerArguments += $Source
-
-    & $compiler @compilerArguments
-
-    if ($LASTEXITCODE -ne 0) {
-        exit $LASTEXITCODE
+    if (-not (Test-Path -LiteralPath $Output) -or (Get-Item -LiteralPath $Output).Length -eq 0) {
+        throw "Build produced no output or an empty file: $Output"
     }
 
     Write-Host "Built $Output" -ForegroundColor Cyan
@@ -205,15 +182,22 @@ if (-not (Test-Path -LiteralPath $generatedDirectory)) {
 $terminalInstallerSupportSource = Join-Path $generatedDirectory 'MbsTerminalInstallSupport.g.cs'
 New-TerminalInstallerSupportSource -OutputPath $terminalInstallerSupportSource
 
-Build-ConsoleExecutable `
+Build-Executable `
     -Source @(
         (Join-Path $repositoryRoot 'src\MbsTerminalInstall.cs'),
         $terminalInstallerSupportSource
     ) `
     -Output (Join-Path $repositoryRoot 'MBS-Terminal-Install.exe') `
+    -Target 'exe' `
     -Icon (Join-Path $repositoryRoot 'assets\terminal-icons\mbs-terminal.ico')
 
-Build-WindowsExecutable `
+Build-Executable `
     -Source (Join-Path $repositoryRoot 'src\MbsTerminalRestore.cs') `
     -Output (Join-Path $repositoryRoot 'MBS-Terminal-Restore.exe') `
+    -Target 'winexe' `
     -Icon (Join-Path $repositoryRoot 'assets\terminal-icons\mbs-terminal.ico')
+
+if (Test-Path -LiteralPath $generatedDirectory) {
+    Remove-Item -LiteralPath $generatedDirectory -Recurse -Force
+    Write-Host "Cleaned up temp build directory." -ForegroundColor DarkGray
+}

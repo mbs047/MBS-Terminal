@@ -417,6 +417,22 @@ function New-InstallPlan {
         InstallEnvoy           = $false
         InstallVapor           = $false
         UpdateTools            = $false
+        InstallGit             = $true
+        InstallNode            = $true
+        InstallNvm             = $false
+        InstallGhCli           = $true
+        InstallPest            = $true
+        InstallLarastan        = $true
+        InstallRector          = $false
+        InstallRay             = $false
+        InstallMkcert          = $true
+        InstallRedis           = $false
+        InstallDocker          = $false
+        InstallTablePlus       = $true
+        InstallFzf             = $true
+        InstallBat             = $true
+        InstallRipgrep         = $true
+        InstallLazygit         = $false
     }
 
     if ($Preset -eq 'Minimal') {
@@ -424,6 +440,15 @@ function New-InstallPlan {
         $plan.InstallComposer = $false
         $plan.InstallLaravel = $false
         $plan.InstallPint = $false
+        $plan.InstallNode = $false
+        $plan.InstallGhCli = $false
+        $plan.InstallPest = $false
+        $plan.InstallLarastan = $false
+        $plan.InstallMkcert = $false
+        $plan.InstallTablePlus = $false
+        $plan.InstallFzf = $false
+        $plan.InstallBat = $false
+        $plan.InstallRipgrep = $false
     }
 
     if ($Preset -eq 'Full') {
@@ -431,6 +456,9 @@ function New-InstallPlan {
         $plan.InstallEnvoy = $true
         $plan.InstallVapor = $true
         $plan.UpdateTools = $true
+        $plan.InstallRector = $true
+        $plan.InstallRedis = $true
+        $plan.InstallLazygit = $true
     }
 
     return $plan
@@ -491,6 +519,38 @@ function Read-InstallPlan {
     $plan.InstallVapor = Ask-YesNo -Question 'Install Laravel Vapor CLI?' -Default $false
     $plan.UpdateTools = Ask-YesNo -Question 'Update existing tools while installing?' -Default $false
 
+    Write-Step 'Choose system tools.'
+    Write-Help 'Git is needed for version control. Node.js LTS is needed for Vite and npm scripts.'
+    $plan.InstallGit = Ask-YesNo -Question 'Install Git when missing?' -Default $true
+    $plan.InstallNode = Ask-YesNo -Question 'Install Node.js LTS when missing?' -Default $true
+
+    if (-not $plan.InstallNode) {
+        $plan.InstallNvm = Ask-YesNo -Question 'Install nvm-windows to manage Node versions instead?' -Default $false
+    }
+
+    $plan.InstallGhCli = Ask-YesNo -Question 'Install GitHub CLI (gh)?' -Default $true
+
+    Write-Step 'Choose code quality tools.'
+    Write-Help 'These install globally via Composer. Larastan = PHPStan with Laravel-aware rules.'
+    $plan.InstallPest = Ask-YesNo -Question 'Install Pest PHP globally?' -Default $true
+    $plan.InstallLarastan = Ask-YesNo -Question 'Install Larastan (PHPStan for Laravel)?' -Default $true
+    $plan.InstallRector = Ask-YesNo -Question 'Install Rector (automated PHP refactoring)?' -Default $false
+    $plan.InstallRay = Ask-YesNo -Question 'Install Ray debug helper (spatie/ray)?' -Default $false
+
+    Write-Step 'Choose local environment tools.'
+    Write-Help 'mkcert sets up trusted local HTTPS. Memurai runs Redis locally for queues and cache.'
+    $plan.InstallMkcert = Ask-YesNo -Question 'Install mkcert (local HTTPS certificates)?' -Default $true
+    $plan.InstallRedis = Ask-YesNo -Question 'Install Memurai (Redis-compatible server)?' -Default $false
+    $plan.InstallDocker = Ask-YesNo -Question 'Install Docker Desktop (for Laravel Sail)?' -Default $false
+    $plan.InstallTablePlus = Ask-YesNo -Question 'Install TablePlus (database GUI)?' -Default $true
+
+    Write-Step 'Choose terminal productivity tools.'
+    Write-Help 'Small utilities that make the terminal faster: fuzzy find, colourised output, fast search, git UI.'
+    $plan.InstallFzf = Ask-YesNo -Question 'Install fzf (fuzzy finder)?' -Default $true
+    $plan.InstallBat = Ask-YesNo -Question 'Install bat (syntax-highlighted cat)?' -Default $true
+    $plan.InstallRipgrep = Ask-YesNo -Question 'Install ripgrep (fast grep)?' -Default $true
+    $plan.InstallLazygit = Ask-YesNo -Question 'Install lazygit (terminal git UI)?' -Default $false
+
     return $plan
 }
 
@@ -507,6 +567,11 @@ function Repair-PlanDependencies {
     if ($Plan.InstallComposer -and (-not $Plan.InstallPhp) -and [string]::IsNullOrWhiteSpace($Plan.PhpDirectory) -and (-not (Test-CommandAvailable -Name 'php'))) {
         Write-SoftWarning 'Composer needs PHP, so PHP install has been enabled.'
         $Plan.InstallPhp = $true
+    }
+
+    if ($Plan.InstallNvm -and $Plan.InstallNode) {
+        Write-SoftWarning 'nvm-windows manages Node versions, so the direct Node.js install was disabled.'
+        $Plan.InstallNode = $false
     }
 }
 
@@ -532,6 +597,22 @@ function Show-InstallPlan {
     Write-PlanRow -Label 'Envoy' -Value (ConvertTo-YesNo $Plan.InstallEnvoy)
     Write-PlanRow -Label 'Vapor CLI' -Value (ConvertTo-YesNo $Plan.InstallVapor)
     Write-PlanRow -Label 'Update tools' -Value (ConvertTo-YesNo $Plan.UpdateTools)
+    Write-Info ''
+    Write-PlanRow -Label 'Git' -Value (ConvertTo-YesNo $Plan.InstallGit)
+    Write-PlanRow -Label 'Node.js' -Value (ConvertTo-NodeSummary $Plan)
+    Write-PlanRow -Label 'GitHub CLI' -Value (ConvertTo-YesNo $Plan.InstallGhCli)
+    Write-PlanRow -Label 'Pest PHP' -Value (ConvertTo-YesNo $Plan.InstallPest)
+    Write-PlanRow -Label 'Larastan' -Value (ConvertTo-YesNo $Plan.InstallLarastan)
+    Write-PlanRow -Label 'Rector' -Value (ConvertTo-YesNo $Plan.InstallRector)
+    Write-PlanRow -Label 'Ray' -Value (ConvertTo-YesNo $Plan.InstallRay)
+    Write-PlanRow -Label 'mkcert' -Value (ConvertTo-YesNo $Plan.InstallMkcert)
+    Write-PlanRow -Label 'Memurai (Redis)' -Value (ConvertTo-YesNo $Plan.InstallRedis)
+    Write-PlanRow -Label 'Docker Desktop' -Value (ConvertTo-YesNo $Plan.InstallDocker)
+    Write-PlanRow -Label 'TablePlus' -Value (ConvertTo-YesNo $Plan.InstallTablePlus)
+    Write-PlanRow -Label 'fzf' -Value (ConvertTo-YesNo $Plan.InstallFzf)
+    Write-PlanRow -Label 'bat' -Value (ConvertTo-YesNo $Plan.InstallBat)
+    Write-PlanRow -Label 'ripgrep' -Value (ConvertTo-YesNo $Plan.InstallRipgrep)
+    Write-PlanRow -Label 'lazygit' -Value (ConvertTo-YesNo $Plan.InstallLazygit)
 }
 
 function ConvertTo-YesNo {
@@ -539,6 +620,20 @@ function ConvertTo-YesNo {
 
     if ($Value) {
         return 'yes'
+    }
+
+    return 'no'
+}
+
+function ConvertTo-NodeSummary {
+    param([pscustomobject] $Plan)
+
+    if ($Plan.InstallNvm) {
+        return 'nvm-windows'
+    }
+
+    if ($Plan.InstallNode) {
+        return 'Node.js LTS'
     }
 
     return 'no'
@@ -621,6 +716,70 @@ function Build-InstallScriptArguments {
         $arguments += '-UpdateTools'
     }
 
+    if ($Plan.InstallGit) {
+        $arguments += '-InstallGit'
+    }
+
+    if ($Plan.InstallNode) {
+        $arguments += '-InstallNode'
+    }
+
+    if ($Plan.InstallNvm) {
+        $arguments += '-InstallNvm'
+    }
+
+    if ($Plan.InstallGhCli) {
+        $arguments += '-InstallGhCli'
+    }
+
+    if ($Plan.InstallPest) {
+        $arguments += '-InstallPest'
+    }
+
+    if ($Plan.InstallLarastan) {
+        $arguments += '-InstallLarastan'
+    }
+
+    if ($Plan.InstallRector) {
+        $arguments += '-InstallRector'
+    }
+
+    if ($Plan.InstallRay) {
+        $arguments += '-InstallRay'
+    }
+
+    if ($Plan.InstallMkcert) {
+        $arguments += '-InstallMkcert'
+    }
+
+    if ($Plan.InstallRedis) {
+        $arguments += '-InstallRedis'
+    }
+
+    if ($Plan.InstallDocker) {
+        $arguments += '-InstallDocker'
+    }
+
+    if ($Plan.InstallTablePlus) {
+        $arguments += '-InstallTablePlus'
+    }
+
+    if ($Plan.InstallFzf) {
+        $arguments += '-InstallFzf'
+    }
+
+    if ($Plan.InstallBat) {
+        $arguments += '-InstallBat'
+    }
+
+    if ($Plan.InstallRipgrep) {
+        $arguments += '-InstallRipgrep'
+    }
+
+    if ($Plan.InstallLazygit) {
+        $arguments += '-InstallLazygit'
+    }
+
     return $arguments
 }
 
@@ -701,7 +860,11 @@ function Invoke-MbsTerminalInstall {
         return 1
     }
 
-    $needsWinget = $plan.InstallWindowsTerminal -or $plan.InstallStarship -or $plan.InstallPhp
+    $needsWinget = $plan.InstallWindowsTerminal -or $plan.InstallStarship -or $plan.InstallPhp -or
+                   $plan.InstallGit -or $plan.InstallNode -or $plan.InstallNvm -or $plan.InstallGhCli -or
+                   $plan.InstallMkcert -or $plan.InstallRedis -or $plan.InstallDocker -or
+                   $plan.InstallTablePlus -or $plan.InstallFzf -or $plan.InstallBat -or
+                   $plan.InstallRipgrep -or $plan.InstallLazygit
 
     if ($needsWinget) {
         Write-Step 'Checking package manager.'

@@ -50,31 +50,20 @@ function Invoke-WingetInstall {
     return $false
 }
 
-$script:AddedPath = ''
+$script:PersistedPathTargets = New-Object System.Collections.Generic.List[string]
 
-function Add-PathEntry {
-    param([string] $Directory)
+function Set-PersistentPathVariable {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $PathValue,
 
-    if (-not (Test-Path -LiteralPath $Directory)) {
-        throw "PATH candidate missing: $Directory"
-    }
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('User', 'Machine')]
+        [string] $Target
+    )
 
-    $script:AddedPath = $Directory
-    $env:Path = "$Directory;$env:Path"
-    Write-Host "[PATH] $Directory"
-}
-
-function Refresh-ProcessPath {
-    if ([string]::IsNullOrWhiteSpace($script:AddedPath)) {
-        return
-    }
-
-    $entries = $env:Path -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-    $hasEntry = $entries | Where-Object { $_.TrimEnd('\') -ieq $script:AddedPath.TrimEnd('\') } | Select-Object -First 1
-
-    if (-not $hasEntry) {
-        $env:Path = "$script:AddedPath;$env:Path"
-    }
+    [void] $script:PersistedPathTargets.Add($Target)
+    Write-Host "[PERSIST-$Target] PATH would include PHP."
 }
 
 function Install-VisualCRuntimeForPhpIfPossible {
@@ -106,6 +95,18 @@ try {
 
     if (-not (Test-Path -LiteralPath $php)) {
         throw "Expected fallback php.exe was not installed: $php"
+    }
+
+    $phpDirectory = Split-Path -Path $php -Parent
+    $processPathEntries = Get-PathEntries -PathValues @($env:Path)
+    $hasPhpPath = $processPathEntries | Where-Object { $_.TrimEnd('\') -ieq $phpDirectory.TrimEnd('\') } | Select-Object -First 1
+
+    if (-not $hasPhpPath) {
+        throw "PHP directory was not added to the installer process PATH: $phpDirectory"
+    }
+
+    if (-not ($script:PersistedPathTargets -contains 'User')) {
+        throw 'PHP directory was not sent to the persistent user PATH writer.'
     }
 
     $versionOutput = @(& $php --version 2>&1)

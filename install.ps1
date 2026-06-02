@@ -115,6 +115,102 @@ function Get-EnvironmentTarget {
     return 'User'
 }
 
+function Get-PathEntries {
+    param([string[]] $PathValues)
+
+    $entries = New-Object System.Collections.Generic.List[string]
+
+    foreach ($pathValue in $PathValues) {
+        if ([string]::IsNullOrWhiteSpace($pathValue)) {
+            continue
+        }
+
+        foreach ($entry in ($pathValue -split ';')) {
+            if ([string]::IsNullOrWhiteSpace($entry)) {
+                continue
+            }
+
+            $hasEntry = $entries | Where-Object { $_.TrimEnd('\') -ieq $entry.TrimEnd('\') } | Select-Object -First 1
+
+            if (-not $hasEntry) {
+                [void] $entries.Add($entry)
+            }
+        }
+    }
+
+    return $entries.ToArray()
+}
+
+function Set-PersistentPathVariable {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $PathValue,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('User', 'Machine')]
+        [string] $Target
+    )
+
+    try {
+        [Environment]::SetEnvironmentVariable('Path', $PathValue, $Target)
+        return
+    } catch {
+        if ($Target -ne 'User') {
+            throw
+        }
+    }
+
+    $environmentKey = $null
+
+    try {
+        $environmentKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true)
+
+        if (-not $environmentKey) {
+            $environmentKey = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Environment')
+        }
+
+        $environmentKey.SetValue('Path', $PathValue, [Microsoft.Win32.RegistryValueKind]::ExpandString)
+    } finally {
+        if ($environmentKey) {
+            $environmentKey.Dispose()
+        }
+    }
+}
+
+function Add-ProcessPathEntry {
+    param([string] $ResolvedDirectory)
+
+    $processEntries = Get-PathEntries -PathValues @($env:Path)
+    $hasProcessEntry = $processEntries | Where-Object { $_.TrimEnd('\') -ieq $ResolvedDirectory.TrimEnd('\') } | Select-Object -First 1
+
+    if (-not $hasProcessEntry) {
+        $env:Path = ($(@($ResolvedDirectory) + $processEntries) -join ';')
+        Write-Step "Added to current installer PATH: $ResolvedDirectory"
+    }
+}
+
+function Add-PersistentPathEntry {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ResolvedDirectory,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('User', 'Machine')]
+        [string] $Target
+    )
+
+    $entries = Get-PathEntries -PathValues @([Environment]::GetEnvironmentVariable('Path', $Target))
+    $hasEntry = $entries | Where-Object { $_.TrimEnd('\') -ieq $ResolvedDirectory.TrimEnd('\') } | Select-Object -First 1
+
+    if (-not $hasEntry) {
+        $entries = @($entries) + $ResolvedDirectory
+        Set-PersistentPathVariable -PathValue ($entries -join ';') -Target $Target
+        Write-Step "Added to $Target PATH: $ResolvedDirectory"
+    }
+
+    return $true
+}
+
 function Add-PathEntry {
     param([string] $Directory)
 
@@ -129,40 +225,41 @@ function Add-PathEntry {
         return
     }
 
+    Add-ProcessPathEntry -ResolvedDirectory $resolvedDirectory
+
     $target = Get-EnvironmentTarget
+    $targets = @($target)
 
-    if ($target -eq 'Machine' -and -not (Test-IsAdministrator)) {
-        Write-SoftWarning "Administrator rights are required to add machine PATH entries. Falling back to user PATH for: $resolvedDirectory"
-        $target = 'User'
+    if ($target -eq 'Machine') {
+        $targets += 'User'
     }
 
-    $currentPath = [Environment]::GetEnvironmentVariable('Path', $target)
-    $entries = @()
+    foreach ($pathTarget in $targets) {
+        if ($pathTarget -eq 'Machine' -and -not (Test-IsAdministrator)) {
+            Write-SoftWarning "Administrator rights are required to add machine PATH entries. Falling back to user PATH for: $resolvedDirectory"
+            continue
+        }
 
-    if (-not [string]::IsNullOrWhiteSpace($currentPath)) {
-        $entries = $currentPath -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-    }
+        try {
+            if (Add-PersistentPathEntry -ResolvedDirectory $resolvedDirectory -Target $pathTarget) {
+                return
+            }
+        } catch {
+            if ($pathTarget -eq 'Machine') {
+                Write-SoftWarning "Could not add to machine PATH. Falling back to user PATH for: $resolvedDirectory. $($_.Exception.Message)"
+                continue
+            }
 
-    $hasEntry = $entries | Where-Object { $_.TrimEnd('\') -ieq $resolvedDirectory.TrimEnd('\') } | Select-Object -First 1
-
-    if (-not $hasEntry) {
-        $entries += $resolvedDirectory
-        [Environment]::SetEnvironmentVariable('Path', ($entries -join ';'), $target)
-        Write-Step "Added to $target PATH: $resolvedDirectory"
-    }
-
-    $processEntries = $env:Path -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-    $hasProcessEntry = $processEntries | Where-Object { $_.TrimEnd('\') -ieq $resolvedDirectory.TrimEnd('\') } | Select-Object -First 1
-
-    if (-not $hasProcessEntry) {
-        $env:Path = "$resolvedDirectory;$env:Path"
+            Write-SoftWarning "Could not save PATH permanently. This installer can still use: $resolvedDirectory. $($_.Exception.Message)"
+            return
+        }
     }
 }
 
 function Refresh-ProcessPath {
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-    $env:Path = @($machinePath, $userPath) -join ';'
+    $env:Path = (Get-PathEntries -PathValues @($env:Path, $machinePath, $userPath)) -join ';'
 }
 
 function Get-WingetScopeArguments {

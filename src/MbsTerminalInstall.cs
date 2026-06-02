@@ -2,7 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Security.Principal;
+
+[assembly: AssemblyProduct("MBS Terminal")]
+[assembly: AssemblyTitle("MBS Terminal Installer")]
+[assembly: AssemblyDescription("Installs the MBS Terminal profile, theme, and Laravel developer tools.")]
+[assembly: AssemblyCompany("MBS Dev")]
+[assembly: AssemblyCopyright("Copyright 2026 MBS Dev")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
 
 namespace MbsTerminalInstall
 {
@@ -126,7 +135,7 @@ namespace MbsTerminalInstall
                 installerArguments.Add(Quote(argument));
             }
 
-            if (args.Length == 0 && !HasSwitch(args, "WaitAtEnd"))
+            if (!HasSwitch(args, "WaitAtEnd"))
             {
                 installerArguments.Add("-WaitAtEnd");
             }
@@ -146,7 +155,16 @@ namespace MbsTerminalInstall
                 return 1;
             }
 
-            process.WaitForExit();
+            const int timeoutMs = 60 * 60 * 1000; // 60 minutes
+
+            if (!process.WaitForExit(timeoutMs))
+            {
+                try { process.Kill(); } catch { }
+                WriteError("Installer timed out after 60 minutes.");
+                WaitForEnter();
+                return 1;
+            }
+
             return process.ExitCode;
         }
 
@@ -236,8 +254,9 @@ namespace MbsTerminalInstall
                     Directory.Delete(path, true);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine("[warn] Temp cleanup failed: " + ex.Message);
             }
         }
     }
